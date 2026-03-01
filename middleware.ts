@@ -29,8 +29,10 @@ export function rateLimitCheck(identifier: string): boolean {
 }
 
 export function middleware(request: NextRequest) {
-  // Get IP or user identifier
-  const identifier = request.ip ?? 'anonymous'
+  // Get IP or user identifier from headers (Next.js doesn't expose IP directly in middleware)
+  const identifier = request.headers.get('x-forwarded-for')?.split(',')[0] ?? 
+                     request.headers.get('x-real-ip') ?? 
+                     'anonymous'
   const path = request.nextUrl.pathname
 
   // Stricter limits for auth endpoints

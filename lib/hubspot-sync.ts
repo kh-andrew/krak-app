@@ -175,7 +175,7 @@ export async function syncDeliveryToHubSpot(deliveryId: string): Promise<boolean
   })
 
   // Create deal for the delivery
-  const hubspotDealId = await createDeliveryDeal(hubspotContactId, {
+  const hubspotDealId = await createOrderDeal(hubspotContactId, {
     id: order.id,
     shopifyOrderNumber: order.shopifyOrderNumber,
     totalAmount: Number(order.totalAmount),
@@ -247,7 +247,7 @@ export async function syncOrderToHubSpot(orderId: string): Promise<boolean> {
     shopifyOrderNumber: order.shopifyOrderNumber,
     totalAmount: Number(order.totalAmount),
     currency: order.currency,
-    deliveredAt: order.delivery?.deliveredAt,
+    deliveredAt: order.delivery?.deliveredAt || null,
     lineItems: order.lineItems as any[],
   }, order.status)
 

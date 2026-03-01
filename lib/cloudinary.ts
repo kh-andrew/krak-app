@@ -1,4 +1,4 @@
-import { v2 as cloudinary } from 'cloudinary'
+import { v2 as cloudinary, UploadApiOptions } from 'cloudinary'
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -10,7 +10,7 @@ cloudinary.config({
 const UPLOAD_OPTIONS = {
   signature: {
     folder: 'signatures',
-    resource_type: 'image',
+    resource_type: 'image' as const,
     // Compress signatures: max width 800px, quality 80%, auto format
     transformation: [
       { width: 800, crop: 'limit' },
@@ -18,17 +18,17 @@ const UPLOAD_OPTIONS = {
     ],
     // Auto-tag for organization
     tags: ['signature', 'delivery'],
-  },
+  } satisfies UploadApiOptions,
   photo: {
     folder: 'delivery-photos',
-    resource_type: 'image',
+    resource_type: 'image' as const,
     // Compress photos: max width 1200px, quality 80%, auto format
     transformation: [
       { width: 1200, crop: 'limit' },
       { quality: 'auto:good', fetch_format: 'auto' },
     ],
     tags: ['delivery-photo', 'proof'],
-  },
+  } satisfies UploadApiOptions,
 }
 
 /**
@@ -48,7 +48,7 @@ export async function uploadSignature(
       {
         ...UPLOAD_OPTIONS.signature,
         public_id: `sig-${orderId.slice(0, 8)}-${Date.now()}`,
-      }
+      } as UploadApiOptions
     )
 
     return {
@@ -77,7 +77,7 @@ export async function uploadDeliveryPhoto(
       {
         ...UPLOAD_OPTIONS.photo,
         public_id: `photo-${orderId.slice(0, 8)}-${Date.now()}`,
-      }
+      } as UploadApiOptions
     )
 
     return {
