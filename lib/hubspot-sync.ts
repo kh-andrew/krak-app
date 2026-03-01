@@ -95,7 +95,7 @@ export async function createDeliveryDeal(
       deal.id,
       'contacts',
       hubspotContactId,
-      [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 3 }]
+      [{ associationCategory: 'HUBSPOT_DEFINED' as any, associationTypeId: 3 }]
     )
 
     return deal.id
