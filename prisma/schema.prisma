@@ -104,6 +104,13 @@ model Order {
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   
+  // Indexes for performance at scale
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([shopifyId])
+  @@index([hubspotSynced])
+  
   @@map("orders")
 }
 
@@ -140,6 +147,12 @@ model Delivery {
   
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+  
+  // Indexes for performance at scale
+  @@index([orderId])
+  @@index([assignedToId])
+  @@index([deliveredAt])
+  @@index([hubspotSynced])
   
   @@map("deliveries")
 }
