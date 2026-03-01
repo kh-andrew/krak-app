@@ -48,6 +48,11 @@ interface ShopifyOrder {
 }
 
 export async function fetchShopifyOrder(shopifyOrderId: string): Promise<ShopifyOrder | null> {
+  if (!shopifyClient) {
+    console.log('Shopify not configured, cannot fetch order')
+    return null
+  }
+
   const query = `
     query getOrder($id: ID!) {
       order(id: $id) {
@@ -113,6 +118,11 @@ export async function updateShopifyOrderStatus(
   shopifyOrderId: string, 
   status: OrderStatus
 ): Promise<boolean> {
+  if (!shopifyClient) {
+    console.log('Shopify not configured, skipping status update')
+    return false
+  }
+
   const statusMap: Record<OrderStatus, string> = {
     RECEIVED: 'PENDING',
     PREPARING: 'PROCESSING',
@@ -163,6 +173,11 @@ export async function createFulfillment(
   shopifyOrderId: string,
   trackingInfo?: { company: string; number: string }
 ): Promise<boolean> {
+  if (!shopifyClient) {
+    console.log('Shopify not configured, skipping fulfillment creation')
+    return false
+  }
+
   const mutation = `
     mutation fulfillmentCreate($input: FulfillmentInput!) {
       fulfillmentCreate(input: $input) {
