@@ -1,0 +1,176 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User roles for team access
+enum UserRole {
+  ADMIN
+  OPERATOR
+  DRIVER
+}
+
+// Order status flow
+enum OrderStatus {
+  RECEIVED      // Order from Shopify received
+  PREPARING     // Being prepared for delivery
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED        // Delivery attempt failed
+}
+
+// Shopify sync status
+enum ShopifySyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  role          UserRole  @default(OPERATOR)
+  password      String    // Hashed
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  isActive      Boolean   @default(true)
+  
+  // Relations
+  assignedDeliveries Delivery[]
+  activityLogs       ActivityLog[]
+  
+  @@map("users")
+}
+
+model Customer {
+  id          String   @id @default(cuid())
+  shopifyId   String?  @unique
+  email       String   @unique
+  firstName   String?
+  lastName    String?
+  phone       String?
+  address     String?
+  city        String?
+  postalCode  String?
+  country     String?
+  hubspotId   String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  orders Order[]
+  
+  @@map("customers")
+}
+
+model Order {
+  id                String            @id @default(cuid())
+  shopifyId         String            @unique
+  shopifyOrderNumber String?
+  
+  // Customer info
+  customerId        String
+  customer          Customer          @relation(fields: [customerId], references: [id])
+  
+  // Order details
+  totalAmount       Decimal           @db.Decimal(10, 2)
+  currency          String            @default("USD")
+  lineItems         Json              // Array of { title, quantity, price, sku }
+  
+  // Status
+  status            OrderStatus       @default(RECEIVED)
+  shopifySyncStatus ShopifySyncStatus @default(PENDING)
+  
+  // Shopify sync timestamps
+  shopifyUpdatedAt  DateTime?
+  
+  // Relations
+  delivery          Delivery?
+  activityLogs      ActivityLog[]
+  
+  // Timestamps
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  @@map("orders")
+}
+
+model Delivery {
+  id              String    @id @default(cuid())
+  orderId         String    @unique
+  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  // Assignment
+  assignedToId    String?
+  assignedTo      User?     @relation(fields: [assignedToId], references: [id])
+  assignedAt      DateTime?
+  
+  // Delivery details
+  deliveryAddress String
+  deliveryNotes   String?
+  
+  // Proof of delivery
+  signatureUrl    String?   // Cloudinary URL
+  photoUrl        String?   // Cloudinary URL
+  deliveredAt     DateTime?
+  
+  // Geolocation
+  latitude        Float?
+  longitude       Float?
+  
+  // Delivery attempt
+  deliveryNotesInternal String?
+  failedReason    String?
+  
+  // HubSpot sync
+  hubspotSynced   Boolean   @default(false)
+  hubspotSyncAt   DateTime?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@map("deliveries")
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  actorId     String?
+  actor       User?    @relation(fields: [actorId], references: [id])
+  
+  action      String   // e.g., "status_changed", "assigned", "delivered"
+  details     Json?    // Additional context
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([orderId])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+// Webhook events from Shopify for processing
+model WebhookEvent {
+  id          String   @id @default(cuid())
+  shopifyId   String   // Unique webhook ID from Shopify
+  topic       String   // e.g., "orders/create", "orders/updated"
+  payload     Json     // Full webhook payload
+  processed   Boolean  @default(false)
+  processedAt DateTime?
+  error       String?
+  
+  createdAt   DateTime @default(now())
+  
+  @@unique([shopifyId])
+  @@index([processed])
+  @@map("webhook_events")
+}
