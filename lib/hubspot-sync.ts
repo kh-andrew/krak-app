@@ -21,7 +21,16 @@ interface OrderData {
   lineItems: any[]
 }
 
+// HubSpot integration disabled until credentials are provided
+// To enable: add HUBSPOT_ACCESS_TOKEN to environment variables
+
 export async function syncCustomerToHubSpot(customerData: CustomerData): Promise<string | null> {
+  // Skip if HubSpot is not configured
+  if (!process.env.HUBSPOT_ACCESS_TOKEN) {
+    console.log('HubSpot not configured, skipping customer sync')
+    return null
+  }
+
   try {
     const properties = {
       email: customerData.email,
@@ -76,6 +85,12 @@ export async function createDeliveryDeal(
   hubspotContactId: string,
   orderData: OrderData
 ): Promise<string | null> {
+  // Skip if HubSpot is not configured
+  if (!process.env.HUBSPOT_ACCESS_TOKEN) {
+    console.log('HubSpot not configured, skipping deal creation')
+    return null
+  }
+
   try {
     const dealProperties = {
       dealname: `Delivery - Order ${orderData.shopifyOrderNumber || orderData.id}`,
@@ -106,6 +121,12 @@ export async function createDeliveryDeal(
 }
 
 export async function syncDeliveryToHubSpot(deliveryId: string): Promise<boolean> {
+  // Skip if HubSpot is not configured
+  if (!process.env.HUBSPOT_ACCESS_TOKEN) {
+    console.log('HubSpot not configured, skipping delivery sync')
+    return false
+  }
+
   const delivery = await prisma.delivery.findUnique({
     where: { id: deliveryId },
     include: {
