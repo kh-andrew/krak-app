@@ -81,9 +81,10 @@ export async function syncCustomerToHubSpot(customerData: CustomerData): Promise
   }
 }
 
-export async function createDeliveryDeal(
+export async function createOrderDeal(
   hubspotContactId: string,
-  orderData: OrderData
+  orderData: OrderData,
+  orderStatus: string = 'New Order'
 ): Promise<string | null> {
   // Skip if HubSpot is not configured
   if (!process.env.HUBSPOT_ACCESS_TOKEN) {
@@ -92,12 +93,18 @@ export async function createDeliveryDeal(
   }
 
   try {
+    // Format line items for the deal description
+    const lineItemsText = orderData.lineItems.map((item: any) => 
+      `- ${item.quantity}x ${item.title} (${item.sku || 'No SKU'}) @ $${item.price}`
+    ).join('\n')
+
     const dealProperties = {
-      dealname: `Delivery - Order ${orderData.shopifyOrderNumber || orderData.id}`,
+      dealname: `Order ${orderData.shopifyOrderNumber || orderData.id}`,
       amount: orderData.totalAmount.toString(),
-      dealstage: 'closedwon',
+      dealstage: 'appointmentscheduled', // Initial stage for new orders
       closedate: orderData.deliveredAt?.toISOString() || new Date().toISOString(),
       pipeline: 'default',
+      description: `Order Status: ${orderStatus}\n\nLine Items:\n${lineItemsText}`,
     }
 
     const deal = await hubspotClient.crm.deals.basicApi.create({
@@ -180,6 +187,74 @@ export async function syncDeliveryToHubSpot(deliveryId: string): Promise<boolean
   if (hubspotDealId) {
     await prisma.delivery.update({
       where: { id: deliveryId },
+      data: {
+        hubspotSynced: true,
+        hubspotSyncAt: new Date(),
+      },
+    })
+    return true
+  }
+
+  return false
+}
+
+export async function syncOrderToHubSpot(orderId: string): Promise<boolean> {
+  // Skip if HubSpot is not configured
+  if (!process.env.HUBSPOT_ACCESS_TOKEN) {
+    console.log('HubSpot not configured, skipping order sync')
+    return false
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      customer: true,
+      delivery: true,
+    },
+  })
+
+  if (!order || !order.customer) {
+    return false
+  }
+
+  const customer = order.customer
+
+  // Sync customer to HubSpot
+  const hubspotContactId = await syncCustomerToHubSpot({
+    email: customer.email,
+    firstName: customer.firstName,
+    lastName: customer.lastName,
+    phone: customer.phone,
+    address: customer.address,
+    city: customer.city,
+    postalCode: customer.postalCode,
+    country: customer.country,
+  })
+
+  if (!hubspotContactId) {
+    return false
+  }
+
+  // Update customer record with HubSpot ID
+  await prisma.customer.update({
+    where: { id: customer.id },
+    data: { hubspotId: hubspotContactId },
+  })
+
+  // Create deal for the order (with line items)
+  const hubspotDealId = await createOrderDeal(hubspotContactId, {
+    id: order.id,
+    shopifyOrderNumber: order.shopifyOrderNumber,
+    totalAmount: Number(order.totalAmount),
+    currency: order.currency,
+    deliveredAt: order.delivery?.deliveredAt,
+    lineItems: order.lineItems as any[],
+  }, order.status)
+
+  if (hubspotDealId) {
+    // Update order with HubSpot sync info
+    await prisma.order.update({
+      where: { id: orderId },
       data: {
         hubspotSynced: true,
         hubspotSyncAt: new Date(),

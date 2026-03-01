@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { shopify } from '@/lib/shopify'
+import { syncOrderToHubSpot } from '@/lib/hubspot-sync'
 import crypto from 'crypto'
 
 // Verify Shopify webhook signature
@@ -123,4 +124,8 @@ async function processOrderCreate(payload: any) {
       details: { source: 'shopify_webhook', shopifyOrderId: id },
     },
   })
+
+  // Sync to HubSpot immediately when order is received
+  await syncOrderToHubSpot(order.id)
+}
 }

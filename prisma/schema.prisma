@@ -92,6 +92,10 @@ model Order {
   // Shopify sync timestamps
   shopifyUpdatedAt  DateTime?
   
+  // HubSpot sync
+  hubspotSynced     Boolean           @default(false)
+  hubspotSyncAt     DateTime?
+  
   // Relations
   delivery          Delivery?
   activityLogs      ActivityLog[]
