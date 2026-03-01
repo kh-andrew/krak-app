@@ -128,4 +128,3 @@ async function processOrderCreate(payload: any) {
   // Sync to HubSpot immediately when order is received
   await syncOrderToHubSpot(order.id)
 }
-}
