@@ -44,22 +44,36 @@ export default async function OrderDetailPage({
   
   // Serialize order data to handle Decimal and Date types
   const serializedOrder = {
-    ...order,
+    id: order.id,
+    shopifyId: order.shopifyId,
+    shopifyOrderNumber: order.shopifyOrderNumber,
+    status: order.status,
     totalAmount: Number(order.totalAmount),
+    currency: order.currency,
     lineItems: order.lineItems as any[],
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
+    customer: order.customer,
     delivery: order.delivery ? {
-      ...order.delivery,
-      assignedAt: order.delivery.assignedAt?.toISOString() || null,
+      id: order.delivery.id,
+      deliveryAddress: order.delivery.deliveryAddress,
+      deliveryNotes: order.delivery.deliveryNotes,
+      assignedTo: order.delivery.assignedTo ? {
+        name: order.delivery.assignedTo.name,
+        email: order.delivery.assignedTo.email,
+      } : null,
+      signatureUrl: order.delivery.signatureUrl,
+      photoUrl: order.delivery.photoUrl,
       deliveredAt: order.delivery.deliveredAt?.toISOString() || null,
-      hubspotSyncAt: order.delivery.hubspotSyncAt?.toISOString() || null,
-      createdAt: order.delivery.createdAt.toISOString(),
-      updatedAt: order.delivery.updatedAt.toISOString(),
+      latitude: order.delivery.latitude,
+      longitude: order.delivery.longitude,
     } : null,
     activityLogs: order.activityLogs.map(log => ({
-      ...log,
+      id: log.id,
+      action: log.action,
+      details: log.details,
       createdAt: log.createdAt.toISOString(),
+      actor: log.actor,
     })),
   }
   
