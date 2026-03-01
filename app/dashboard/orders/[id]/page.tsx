@@ -42,5 +42,25 @@ export default async function OrderDetailPage({
     select: { id: true, name: true, email: true },
   })
   
-  return <OrderDetailClient order={order} users={users} />
+  // Serialize order data to handle Decimal and Date types
+  const serializedOrder = {
+    ...order,
+    totalAmount: Number(order.totalAmount),
+    createdAt: order.createdAt.toISOString(),
+    updatedAt: order.updatedAt.toISOString(),
+    delivery: order.delivery ? {
+      ...order.delivery,
+      assignedAt: order.delivery.assignedAt?.toISOString() || null,
+      deliveredAt: order.delivery.deliveredAt?.toISOString() || null,
+      hubspotSyncAt: order.delivery.hubspotSyncAt?.toISOString() || null,
+      createdAt: order.delivery.createdAt.toISOString(),
+      updatedAt: order.delivery.updatedAt.toISOString(),
+    } : null,
+    activityLogs: order.activityLogs.map(log => ({
+      ...log,
+      createdAt: log.createdAt.toISOString(),
+    })),
+  }
+  
+  return <OrderDetailClient order={serializedOrder} users={users} />
 }
