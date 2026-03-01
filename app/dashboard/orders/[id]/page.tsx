@@ -3,7 +3,6 @@ import { requireAuth } from '@/lib/auth-helpers'
 import { notFound } from 'next/navigation'
 import OrderDetailClient from './OrderDetailClient'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default async function OrderDetailPage({
   params,
 }: {
@@ -43,18 +42,27 @@ export default async function OrderDetailPage({
     select: { id: true, name: true, email: true },
   })
   
-  // Serialize order data to handle Decimal and Date types
-  const serializedOrder: any = {
+  // Serialize order data - only include fields that match the interface
+  const serializedOrder = {
     id: order.id,
     shopifyId: order.shopifyId,
     shopifyOrderNumber: order.shopifyOrderNumber,
     status: order.status,
     totalAmount: Number(order.totalAmount),
     currency: order.currency,
-    lineItems: order.lineItems,
+    lineItems: order.lineItems as any[],
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
-    customer: order.customer,
+    customer: order.customer ? {
+      firstName: order.customer.firstName,
+      lastName: order.customer.lastName,
+      email: order.customer.email,
+      phone: order.customer.phone,
+      address: order.customer.address,
+      city: order.customer.city,
+      postalCode: order.customer.postalCode,
+      country: order.customer.country,
+    } : null,
     delivery: order.delivery ? {
       id: order.delivery.id,
       deliveryAddress: order.delivery.deliveryAddress,
@@ -74,9 +82,12 @@ export default async function OrderDetailPage({
       action: log.action,
       details: log.details,
       createdAt: log.createdAt.toISOString(),
-      actor: log.actor,
+      actor: log.actor ? {
+        name: log.actor.name,
+        email: log.actor.email,
+      } : null,
     })),
   }
   
-  return <OrderDetailClient order={serializedOrder} users={users as any} />
+  return <OrderDetailClient order={serializedOrder as any} users={users as any} />
 }
