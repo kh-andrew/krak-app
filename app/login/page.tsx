@@ -25,7 +25,7 @@ export default function LoginPage() {
         <div className="text-center">
           <div className="flex justify-center mb-6">
             <Image
-              src="/krak-logo-transparent.jpg"
+              src="/krak-logo.jpg"
               alt="Krak"
               width={200}
               height={60}

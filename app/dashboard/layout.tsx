@@ -22,7 +22,7 @@ export default async function DashboardLayout({
             <div className="flex items-center">
               <Link href="/dashboard" className="flex items-center gap-3">
                 <Image
-                  src="/krak-logo-transparent.jpg"
+                  src="/krak-logo.jpg"
                   alt="Krak"
                   width={100}
                   height={35}
