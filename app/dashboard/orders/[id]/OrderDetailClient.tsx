@@ -29,7 +29,7 @@ interface OrderDetailPageProps {
       id: string
       deliveryAddress: string
       deliveryNotes: string | null
-      assignedTo: { name: string; email: string } | null
+      assignedTo: { name: string | null; email: string } | null
       signatureUrl: string | null
       photoUrl: string | null
       deliveredAt: string | null
