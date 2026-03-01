@@ -77,5 +77,5 @@ export default async function OrderDetailPage({
     })),
   }
   
-  return <OrderDetailClient order={serializedOrder} users={users} />
+  return <OrderDetailClient order={serializedOrder as any} users={users} />
 }
