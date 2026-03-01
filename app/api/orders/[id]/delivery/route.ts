@@ -73,14 +73,16 @@ export async function POST(
     
     // Upload signature if provided
     if (signatureDataUrl) {
-      signatureUrl = await uploadSignature(signatureDataUrl, id)
+      const signatureResult = await uploadSignature(signatureDataUrl, id)
+      signatureUrl = signatureResult?.url || null
     }
     
     // Upload photo if provided
     if (photoFile) {
       const bytes = await photoFile.arrayBuffer()
       const buffer = Buffer.from(bytes)
-      photoUrl = await uploadDeliveryPhoto(buffer, id)
+      const photoResult = await uploadDeliveryPhoto(buffer, id)
+      photoUrl = photoResult?.url || null
     }
     
     // Update delivery
