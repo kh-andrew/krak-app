@@ -48,7 +48,7 @@ export async function syncCustomerToHubSpot(customerData: CustomerData): Promise
           customerData.email,
           undefined,
           undefined,
-          'email'
+          ['email']
         )
         
         await hubspotClient.crm.contacts.basicApi.update(existing.id, {
