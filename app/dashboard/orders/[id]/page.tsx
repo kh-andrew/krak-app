@@ -46,6 +46,7 @@ export default async function OrderDetailPage({
   const serializedOrder = {
     ...order,
     totalAmount: Number(order.totalAmount),
+    lineItems: order.lineItems as any[],
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
     delivery: order.delivery ? {
