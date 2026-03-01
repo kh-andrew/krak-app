@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth-helpers'
 import { notFound } from 'next/navigation'
 import OrderDetailClient from './OrderDetailClient'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default async function OrderDetailPage({
   params,
 }: {
@@ -43,14 +44,14 @@ export default async function OrderDetailPage({
   })
   
   // Serialize order data to handle Decimal and Date types
-  const serializedOrder = {
+  const serializedOrder: any = {
     id: order.id,
     shopifyId: order.shopifyId,
     shopifyOrderNumber: order.shopifyOrderNumber,
     status: order.status,
     totalAmount: Number(order.totalAmount),
     currency: order.currency,
-    lineItems: order.lineItems as any[],
+    lineItems: order.lineItems,
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
     customer: order.customer,
@@ -77,5 +78,5 @@ export default async function OrderDetailPage({
     })),
   }
   
-  return <OrderDetailClient order={serializedOrder as any} users={users} />
+  return <OrderDetailClient order={serializedOrder} users={users} />
 }
