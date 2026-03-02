@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-helpers'
 import Link from 'next/link'
+import { InventoryForm } from './components/InventoryForm'
+import { CSVUpload } from './components/CSVUpload'
 
 export default async function InventoryPage() {
   await requireAuth()
@@ -28,6 +30,49 @@ export default async function InventoryPage() {
           {lowStockCount > 0 && (
             <div className="bg-red-900/50 border border-red-700 text-red-200 px-4 py-2 rounded-lg">
               <span className="font-semibold">{lowStockCount}</span> items below reorder point
+            </div>
+          )}
+          <Link
+            href="/dashboard"
+            className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            Back to Orders
+          </Link>
+        </div>
+      </div>
+      
+      {/* Add New Item Form */}
+      <div className="bg-[#141414] p-6 rounded-xl border border-[#2A2A2A]">
+        <h2 className="text-lg font-semibold text-white mb-4">Add New Item</h2>
+        <InventoryForm />
+      </div>
+
+      {/* CSV Upload */}
+      <CSVUpload />
+      
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="bg-[#141414] p-4 rounded-xl border border-[#2A2A2A]">
+          <p className="text-sm text-gray-400">Total SKUs</p>
+          <p className="text-2xl font-bold text-white">{inventory.length}</p>
+        </div>
+        <div className="bg-[#141414] p-4 rounded-xl border border-[#2A2A2A]">
+          <p className="text-sm text-gray-400">Low Stock</p>
+          <p className="text-2xl font-bold text-[#EF4444]">{lowStockCount}</p>
+        </div>
+        <div className="bg-[#141414] p-4 rounded-xl border border-[#2A2A2A]">
+          <p className="text-sm text-gray-400">Total Units</p>
+          <p className="text-2xl font-bold text-white">
+            {inventory.reduce((sum, i) => sum + i.currentStock, 0).toLocaleString()}
+          </p>
+        </div>
+        <div className="bg-[#141414] p-4 rounded-xl border border-[#2A2A2A]">
+          <p className="text-sm text-gray-400">Available</p>
+          <p className="text-2xl font-bold text-[#22C55E]">
+            {inventory.reduce((sum, i) => sum + i.available, 0).toLocaleString()}
+          </p>
+        </div>
+      </div>
             </div>
           )}
           <Link
