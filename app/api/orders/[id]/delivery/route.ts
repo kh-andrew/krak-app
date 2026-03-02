@@ -52,8 +52,12 @@ export async function POST(
       data: {
         orderId: id,
         actorId: session.user.id,
+        actorEmail: session.user.email,
         action: 'delivery_assigned',
-        details: { assignedToId: userId },
+        entityType: 'delivery',
+        fieldName: 'assignedToId',
+        newValue: userId,
+        notes: `Delivery assigned to user ${userId}`,
       },
     })
     
@@ -120,13 +124,13 @@ export async function POST(
       data: {
         orderId: id,
         actorId: session.user.id,
+        actorEmail: session.user.email,
         action: 'delivery_completed',
-        details: {
-          signatureCaptured: !!signatureUrl,
-          photoCaptured: !!photoUrl,
-          geolocation: latitude && longitude ? { latitude, longitude } : null,
-          shopifySynced,
-        },
+        entityType: 'delivery',
+        fieldName: 'status',
+        oldValue: delivery.order.status,
+        newValue: 'DELIVERED',
+        notes: `Delivery completed. Signature: ${signatureUrl ? 'Yes' : 'No'}, Photo: ${photoUrl ? 'Yes' : 'No'}`,
       },
     })
     

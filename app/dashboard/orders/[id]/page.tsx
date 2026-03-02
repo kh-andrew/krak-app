@@ -80,7 +80,11 @@ export default async function OrderDetailPage({
     activityLogs: order.activityLogs.map(log => ({
       id: log.id,
       action: log.action,
-      details: log.details,
+      entityType: log.entityType,
+      fieldName: log.fieldName,
+      oldValue: log.oldValue,
+      newValue: log.newValue,
+      notes: log.notes,
       createdAt: log.createdAt.toISOString(),
       actor: log.actor ? {
         name: log.actor.name,

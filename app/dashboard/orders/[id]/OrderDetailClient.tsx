@@ -28,7 +28,11 @@ interface Actor {
 interface ActivityLog {
   id: string;
   action: string;
-  details: string | null;
+  entityType: string;
+  fieldName: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  notes: string | null;
   createdAt: string;
   actor: Actor | null;
 }
@@ -254,7 +258,12 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
                     <div className="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-blue-500" />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-900">{log.action}</p>
-                      {log.details && <p className="text-sm text-gray-600">{log.details}</p>}
+                      {log.fieldName && (
+                        <p className="text-sm text-gray-600">
+                          {log.fieldName}: {log.oldValue || '—'} → {log.newValue || '—'}
+                        </p>
+                      )}
+                      {log.notes && <p className="text-sm text-gray-500">{log.notes}</p>}
                       <p className="text-xs text-gray-400 mt-1">
                         by {log.actor?.name || log.actor?.email || 'Unknown'} • {new Date(log.createdAt).toLocaleString()}
                       </p>

@@ -7,22 +7,21 @@ import { OrderSearch } from './components/OrderSearch'
 import { OrderFilters } from './components/OrderFilters'
 import { MiniDashboard } from './components/MiniDashboard'
 
-interface SearchParams {
-  search?: string
-  status?: string
-  dateFrom?: string
-  dateTo?: string
-  country?: string
-}
-
 export default async function DashboardPage({ 
   searchParams 
 }: { 
-  searchParams: SearchParams 
+  searchParams: Promise<{ 
+    search?: string
+    status?: string
+    dateFrom?: string
+    dateTo?: string
+    country?: string
+  }> 
 }) {
   await requireAuth()
   
-  const { search, status, dateFrom, dateTo, country } = searchParams
+  const params = await searchParams
+  const { search, status, dateFrom, dateTo, country } = params
   
   // Build where clause for filtering
   const where: any = {}

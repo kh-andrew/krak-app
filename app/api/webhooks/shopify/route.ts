@@ -116,12 +116,15 @@ async function processOrderCreate(payload: any) {
     },
   })
 
-  // Log activity
+  // Log activity (lean schema)
   await prisma.activityLog.create({
     data: {
       orderId: order.id,
       action: 'order_received',
-      details: { source: 'shopify_webhook', shopifyOrderId: id },
+      entityType: 'order',
+      fieldName: 'status',
+      newValue: 'RECEIVED',
+      notes: `Order received from Shopify webhook`,
     },
   })
 
