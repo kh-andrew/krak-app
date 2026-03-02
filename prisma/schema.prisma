@@ -208,9 +208,15 @@ model WebhookEvent {
 model Inventory {
   id            String   @id @default(cuid())
   sku           String   @unique
-  name          String
   
-  // Stock levels
+  // Product info
+  name          String
+  category      String?  // UDT, 3DH, OHL, etc.
+  productLine   String?  // Lipstick, Lip Oil, Blush, etc.
+  variant       String?  // Shade/color code
+  size          String?  // REG, MIN, SET, etc.
+  
+  // Stock levels (aggregated across all batches)
   currentStock  Int      @default(0)
   reserved      Int      @default(0)
   available     Int      @default(0)
@@ -218,15 +224,61 @@ model Inventory {
   // Reorder logic
   reorderPoint  Int?
   reorderQty    Int?
+  leadTimeDays  Int?     // Days from order to delivery
   
   // Agent tracking
   lastAgentAction String?
   agentConfidence Float?
   
+  // Relations
+  batches       InventoryBatch[]
+  
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
   @@index([sku])
+  @@index([category])
   @@index([available])
   @@map("inventory")
+}
+
+// Batch tracking for traceability and recalls
+model InventoryBatch {
+  id            String   @id @default(cuid())
+  
+  // Relations
+  inventoryId   String
+  inventory     Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  
+  // Batch identification
+  batchNumber   String   // Manufacturer batch code
+  internalCode  String?  // Your internal tracking code
+  
+  // Batch details
+  quantity      Int
+  quantityUsed  Int      @default(0)
+  quantityAvailable Int  @default(0)
+  
+  // Dates
+  manufacturedAt DateTime?
+  receivedAt    DateTime @default(now())
+  expiresAt     DateTime? // For products with shelf life
+  
+  // Quality/Recall
+  status        String   @default("ACTIVE") // ACTIVE, QUARANTINE, RECALLED, EXPIRED
+  qualityNotes  String?
+  recallReason  String?
+  
+  // Traceability
+  supplier      String?
+  poNumber      String?  // Purchase order reference
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([inventoryId])
+  @@index([batchNumber])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("inventory_batches")
 }
