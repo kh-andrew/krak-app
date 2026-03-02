@@ -88,18 +88,18 @@ export async function PATCH(
     },
   })
   
-  // Log activity
+  // Log activity (lean schema)
   await prisma.activityLog.create({
     data: {
       orderId: id,
       actorId: session.user.id,
+      actorEmail: session.user.email,
       action: 'status_changed',
-      details: { 
-        from: order.status, 
-        to: status, 
-        notes,
-        shopifySynced,
-      },
+      entityType: 'order',
+      fieldName: 'status',
+      oldValue: order.status,
+      newValue: status,
+      notes: notes || `Status changed from ${order.status} to ${status}`,
     },
   })
   

@@ -164,13 +164,25 @@ model ActivityLog {
   
   actorId     String?
   actor       User?    @relation(fields: [actorId], references: [id])
+  actorEmail  String?  // Denormalized for audit trail integrity
   
-  action      String   // e.g., "status_changed", "assigned", "delivered"
-  details     Json?    // Additional context
+  action      String   // ENUM: status_changed, assigned, delivered, note_added, etc.
+  
+  // Lean change tracking (no JSON blob)
+  entityType  String   // "order", "delivery", "inventory"
+  fieldName   String?  // "status", "assignedToId", etc.
+  oldValue    String?  // Previous value (stringified)
+  newValue    String?  // New value (stringified)
+  notes       String?  // Human-readable context
+  
+  // Audit metadata
+  ipAddress   String?
+  userAgent   String?
   
   createdAt   DateTime @default(now())
   
-  @@index([orderId])
+  @@index([orderId, createdAt])
+  @@index([entityType, createdAt])
   @@index([createdAt])
   @@map("activity_logs")
 }
