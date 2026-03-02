@@ -1,0 +1,10 @@
+# Ignore files that shouldn't be deployed
+*.log
+.env*.local
+.vercel
+.github
+.vscode
+*.md
+!README.md
+prisma/migrations
+prisma/seed*.ts
