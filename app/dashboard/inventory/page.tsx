@@ -75,14 +75,7 @@ export default async function InventoryPage() {
       </div>
             </div>
           )}
-          <Link
-            href="/dashboard"
-            className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-          >
-            Back to Orders
-          </Link>
-        </div>
-      </div>
+         
       
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
