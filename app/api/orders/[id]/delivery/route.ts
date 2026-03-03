@@ -2,20 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-helpers'
 import { uploadSignature, uploadDeliveryPhoto } from '@/lib/cloudinary'
-import { updateShopifyOrderStatus } from '@/lib/shopify-orders'
+import { updateShopifyOrderStatus, createFulfillment } from '@/lib/shopify-orders'
 import { syncDeliveryToHubSpot } from '@/lib/hubspot-sync'
-import { z } from 'zod'
-
-const assignSchema = z.object({
-  userId: z.string(),
-})
-
-const deliverSchema = z.object({
-  signatureDataUrl: z.string().optional(),
-  notes: z.string().optional(),
-  latitude: z.number().optional(),
-  longitude: z.number().optional(),
-})
 
 export async function POST(
   req: Request,
@@ -67,7 +55,7 @@ export async function POST(
   // Handle delivery completion
   if (action === 'complete') {
     const signatureDataUrl = formData.get('signatureDataUrl') as string | null
-    const photoFile = formData.get('photo') as File | null
+    const photo = formData.get('photo') as File | null
     const notes = formData.get('notes') as string | null
     const latitude = formData.get('latitude') ? parseFloat(formData.get('latitude') as string) : null
     const longitude = formData.get('longitude') ? parseFloat(formData.get('longitude') as string) : null
@@ -81,9 +69,16 @@ export async function POST(
       signatureUrl = signatureResult?.url || null
     }
     
-    // Upload photo if provided
-    if (photoFile) {
-      const bytes = await photoFile.arrayBuffer()
+    // Upload photo if provided (base64 or file)
+    const photoBase64 = formData.get('photoBase64') as string | null
+    if (photoBase64) {
+      // Convert base64 to buffer
+      const buffer = Buffer.from(photoBase64, 'base64')
+      const photoResult = await uploadDeliveryPhoto(buffer, id)
+      photoUrl = photoResult?.url || null
+    } else if (photo && photo.size > 0) {
+      // Handle file upload (fallback)
+      const bytes = await photo.arrayBuffer()
       const buffer = Buffer.from(bytes)
       const photoResult = await uploadDeliveryPhoto(buffer, id)
       photoUrl = photoResult?.url || null
@@ -108,8 +103,19 @@ export async function POST(
       data: { status: 'DELIVERED' },
     })
     
-    // Sync to Shopify
-    const shopifySynced = await updateShopifyOrderStatus(delivery.order.shopifyId, 'DELIVERED')
+    // Sync to Shopify - Update status AND create fulfillment
+    let shopifySynced = false
+    try {
+      // First update the order status (adds tag)
+      const statusUpdated = await updateShopifyOrderStatus(delivery.order.shopifyId, 'DELIVERED')
+      
+      // Then create fulfillment (actually marks as fulfilled)
+      const fulfillmentCreated = await createFulfillment(delivery.order.shopifyId)
+      
+      shopifySynced = statusUpdated && fulfillmentCreated
+    } catch (error) {
+      console.error('Shopify sync error:', error)
+    }
     
     await prisma.order.update({
       where: { id },
@@ -137,7 +143,11 @@ export async function POST(
     // Sync to HubSpot (async)
     syncDeliveryToHubSpot(delivery.id).catch(console.error)
     
-    return NextResponse.json(updatedDelivery)
+    return NextResponse.json({ 
+      success: true, 
+      delivery: updatedDelivery,
+      shopifySynced 
+    })
   }
   
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
