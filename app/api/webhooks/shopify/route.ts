@@ -11,7 +11,6 @@ function verifyWebhook(body: string, hmac: string): boolean {
     .createHmac('sha256', secret)
     .update(body, 'utf8')
     .digest('base64')
-  
   return crypto.timingSafeEqual(
     Buffer.from(hash),
     Buffer.from(hmac)
@@ -59,7 +58,9 @@ async function processOrderCreate(payload: any) {
 
   // Upsert customer
   const customerData = await prisma.customer.upsert({
-    where: { email: email || customer?.email || `order-${id}@placeholder.com` },
+    where: { 
+      email: email || customer?.email || `order-${id}@placeholder.com`
+    },
     update: {
       firstName: customer?.first_name,
       lastName: customer?.last_name,
@@ -124,10 +125,10 @@ async function processOrderCreate(payload: any) {
       entityType: 'order',
       fieldName: 'status',
       newValue: 'RECEIVED',
-      notes: `Order received from Shopify webhook`,
+      notes: 'Order received from Shopify webhook',
     },
   })
 
   // Sync to HubSpot immediately when order is received
-  await syncOrderToHubSpot(order.id)
+await syncOrderToHubSpot(order.id)
 }
