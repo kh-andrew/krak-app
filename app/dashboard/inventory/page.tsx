@@ -1,4 +1,3 @@
-import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-helpers'
 import Link from 'next/link'
 
