@@ -6,7 +6,8 @@ export async function GET() {
   await requireAuth()
   
   const inventory = await prisma.inventory.findMany({
-    orderBy: { sku: 'asc' }
+    orderBy: { productId: 'asc' }
+
   })
   
   return NextResponse.json(inventory)
