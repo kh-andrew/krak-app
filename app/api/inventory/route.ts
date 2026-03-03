@@ -3,48 +3,48 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-helpers'
 
 // GET /api/inventory
-// Returns inventory with product details (handles empty tables)
+// Returns inventory with product details using Prisma relations
 export async function GET() {
   await requireAuth()
   
   try {
-    // Check if tables exist first
-    const tableExists = await prisma.$queryRaw`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_name = 'inventory'
-      ) as exists
-    `
+    // Use Prisma's relation query to get inventory with product details
+    const inventory = await prisma.inventory.findMany({
+      include: {
+        product: {
+          select: {
+            sku: true,
+            name: true,
+            basePrice: true,
+            isBundle: true
+          }
+        }
+      },
+      orderBy: {
+        available: 'asc'
+      },
+      take: 100
+    })
     
-    if (!(tableExists as any[])[0]?.exists) {
-      return NextResponse.json([])
-    }
+    // Transform to match expected format
+    const formatted = inventory.map(item => ({
+      id: item.id,
+      currentStock: item.currentStock,
+      reserved: item.reserved,
+      available: item.available,
+      reorderPoint: item.reorderPoint,
+      reorderQty: item.reorderQty,
+      sku: item.product?.sku || 'UNKNOWN',
+      name: item.product?.name || 'Unknown Product',
+      basePrice: item.product?.basePrice || 0,
+      isBundle: item.product?.isBundle || false
+    }))
     
-    // Try to get inventory with product details
-    // Use LEFT JOIN to handle cases where product might not exist
-    const inventory = await prisma.$queryRaw`
-      SELECT 
-        i.id,
-        i."currentStock",
-        i.reserved,
-        i.available,
-        i."reorderPoint",
-        i."reorderQty",
-        COALESCE(p.sku, 'UNKNOWN') as sku,
-        COALESCE(p.name, 'Unknown Product') as name,
-        COALESCE(p."basePrice", 0) as "basePrice",
-        COALESCE(p."isBundle", false) as "isBundle"
-      FROM inventory i
-      LEFT JOIN product p ON i."productId" = p.id
-      ORDER BY i.available ASC
-      LIMIT 100
-    `
-    
-    return NextResponse.json(inventory || [])
+    return NextResponse.json(formatted)
     
   } catch (error) {
     console.error('inventory fetch error:', error)
-    // Return empty array instead of error
+    // Return empty array on error
     return NextResponse.json([])
   }
 }
