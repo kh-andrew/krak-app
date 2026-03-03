@@ -435,11 +435,13 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
                   </div>
                 </div>
 
-                {/* Photo Capture */}
+                {/* Photo Capture / Upload */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Delivery Photo {capturedPhoto && <span className="text-[#22C55E]">✓</span>}
                   </label>
+                  
+                  {/* Hidden inputs for camera and file upload */}
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -448,17 +450,39 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
                     onChange={handlePhotoCapture}
                     className="hidden"
                   />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoCapture}
+                    className="hidden"
+                    id="file-upload"
+                  />
+                  
                   {!capturedPhoto ? (
-                    <button
-                      onClick={triggerCamera}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-[#2A2A2A] rounded-lg hover:border-[#3A3A3A] hover:bg-[#1A1A1A] transition-colors"
-                    >
-                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      <span className="text-gray-400">Take Photo</span>
-                    </button>
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Camera Button */}
+                      <button
+                        onClick={triggerCamera}
+                        className="flex flex-col items-center justify-center gap-2 px-4 py-6 border-2 border-dashed border-[#2A2A2A] rounded-lg hover:border-[#FF6B4A]/50 hover:bg-[#1A1A1A] transition-colors"
+                      >
+                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span className="text-gray-400 text-sm">Take Photo</span>
+                      </button>
+                      
+                      {/* Upload Button */}
+                      <label 
+                        htmlFor="file-upload"
+                        className="flex flex-col items-center justify-center gap-2 px-4 py-6 border-2 border-dashed border-[#2A2A2A] rounded-lg hover:border-[#3B82F6]/50 hover:bg-[#1A1A1A] transition-colors cursor-pointer"
+                      >
+                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                        <span className="text-gray-400 text-sm">Upload Photo</span>
+                      </label>
+                    </div>
                   ) : (
                     <div className="relative">
                       <img
