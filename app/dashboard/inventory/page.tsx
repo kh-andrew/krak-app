@@ -12,7 +12,7 @@ export default async function InventoryPage() {
     inventory = await prisma.inventory.findMany({
       orderBy: [
         { available: 'asc' },
-        { sku: 'asc' }
+        { productId: 'asc' }
       ],
       take: 100,
     })
