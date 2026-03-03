@@ -22,7 +22,7 @@ export async function GET() {
         p."basePrice",
         p."isBundle"
       FROM "inventory" i
-      JOIN "Product" p ON i."productId" = p.id
+      JOIN "product" p ON i."productId" = p.id
       ORDER BY i.available ASC
       LIMIT 100
     `
