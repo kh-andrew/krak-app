@@ -27,11 +27,29 @@ export async function POST(
   // Handle assignment
   if (action === 'assign') {
     const userId = formData.get('userId') as string
+    const driverEmail = formData.get('driverEmail') as string // For Telegram workflow
+    
+    const assignToId = userId || driverEmail
+    
+    if (!assignToId) {
+      return NextResponse.json({ error: 'User ID or driver email required' }, { status: 400 })
+    }
+    
+    // Find or create user if assigning by email
+    let assignedUserId = assignToId
+    if (driverEmail) {
+      const user = await prisma.user.findUnique({
+        where: { email: driverEmail }
+      })
+      if (user) {
+        assignedUserId = user.id
+      }
+    }
     
     const updated = await prisma.delivery.update({
       where: { id: delivery.id },
       data: {
-        assignedToId: userId,
+        assignedToId: assignedUserId,
         assignedAt: new Date(),
       },
     })
