@@ -4,7 +4,6 @@ import React, { useRef, useState, useCallback } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 import { useRouter } from 'next/navigation';
 
-// Types - matching the actual data structure from page.tsx
 interface AssignedTo {
   name: string | null;
   email: string;
@@ -134,6 +133,7 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
       console.error('Error assigning delivery:', error);
     }
   }, [order.id, router]);
+
   const handleCompleteDelivery = useCallback(async () => {
     if (!signatureData && !capturedPhoto) {
       alert('Please provide a signature or photo to complete delivery');
@@ -162,7 +162,6 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
     }
   }, [order.id, signatureData, capturedPhoto, deliveryNotes, router]);
 
-  // Status colors with good contrast for dark theme
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       RECEIVED: 'bg-[#1A3A2F] text-[#22C55E] border border-[#22C55E]/30',
@@ -180,7 +179,6 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
 
   return (
     <div className="max-w-6xl mx-auto p-6 bg-[#0A0A0A] min-h-screen">
-      {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
@@ -196,10 +194,9 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
           </span>
         </div>
       </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Left Column - Order Details */}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-6">
-          {/* Customer Info */}
           <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-6">
             <h2 className="text-lg font-semibold text-white mb-4">Customer Information</h2>
             <div className="space-y-3">
@@ -224,7 +221,6 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
             </div>
           </div>
 
-          {/* Order Items */}
           <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-6">
             <h2 className="text-lg font-semibold text-white mb-4">Order Items</h2>
             <div className="space-y-3">
@@ -244,7 +240,6 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
             </div>
           </div>
 
-          {/* Activity Log */}
           <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-6">
             <h2 className="text-lg font-semibold text-white mb-4">Activity Log</h2>
             <div className="space-y-4 max-h-64 overflow-y-auto">
@@ -273,9 +268,7 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
           </div>
         </div>
 
-        {/* Right Column - Delivery Management */}
-              <div className="space-y-6">
-          {/* Delivery Info */}
+        <div className="space-y-6">
           <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-6">
             <h2 className="text-lg font-semibold text-white mb-4">Delivery Information</h2>
             
@@ -295,7 +288,6 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
                   </div>
                 )}
 
-                {/* Assign Delivery */}
                 <div className="pt-4 border-t border-[#2A2A2A]">
                   <p className="text-sm font-medium text-white mb-3">Assign to Driver:</p>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -331,12 +323,10 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
             )}
           </div>
 
-          {/* Delivery Completion - Signature & Photo */}
-        {order.delivery && (
+          {order.delivery && (
             <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-6">
               <h2 className="text-lg font-semibold text-white mb-4">Complete Delivery</h2>
               
-              {/* Signature Pad */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Customer Signature
@@ -369,7 +359,6 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
                 )}
               </div>
 
-              {/* Photo Capture */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Delivery Photo (Optional)
@@ -378,4 +367,66 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
-                  capture="environment"        
+                  capture="environment"
+                  onChange={handlePhotoCapture}
+                  className="hidden"
+                />
+                <button
+                  onClick={triggerCamera}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-[#2A2A2A] rounded-lg hover:border-[#3A3A3A] hover:bg-[#1A1A1A] transition-colors"
+                >
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span className="text-gray-400">Take Photo</span>
+                </button>
+                {capturedPhoto && (
+                  <div className="mt-3">
+                    <img
+                      src={capturedPhoto}
+                      alt="Delivery proof"
+                      className="w-full h-48 object-cover rounded-lg"
+                    />
+                    <button
+                      onClick={() => setCapturedPhoto(null)}
+                      className="text-sm text-[#EF4444] hover:text-[#FF6B4A] mt-2"
+                    >
+                      Remove photo
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Delivery Notes
+                </label>
+                <textarea
+                  value={deliveryNotes}
+                  onChange={(e) => setDeliveryNotes(e.target.value)}
+                  placeholder="Add any notes about the delivery..."
+                  rows={3}
+                  className="w-full px-3 py-2 bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#FF6B4A] focus:border-transparent"
+                />
+              </div>
+
+              <button
+                onClick={handleCompleteDelivery}
+                disabled={isSubmitting || (!signatureData && !capturedPhoto)}
+                className={`w-full py-3 px-4 rounded-lg font-medium text-white transition-colors ${
+                  isSubmitting || (!signatureData && !capturedPhoto)
+                    ? 'bg-gray-600 cursor-not-allowed'
+                    : 'bg-[#22C55E] hover:bg-[#16A34A]'
+                }`}
+              >
+                {isSubmitting ? 'Completing...' : 'Mark as Delivered'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
