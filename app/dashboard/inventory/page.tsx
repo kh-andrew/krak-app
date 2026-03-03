@@ -73,33 +73,6 @@ export default async function InventoryPage() {
           </p>
         </div>
       </div>
-            </div>
-          )}
-         
-      
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-[#141414] p-4 rounded-xl border border-[#2A2A2A]">
-          <p className="text-sm text-gray-400">Total SKUs</p>
-          <p className="text-2xl font-bold text-white">{inventory.length}</p>
-        </div>
-        <div className="bg-[#141414] p-4 rounded-xl border border-[#2A2A2A]">
-          <p className="text-sm text-gray-400">Low Stock</p>
-          <p className="text-2xl font-bold text-[#EF4444]">{lowStockCount}</p>
-        </div>
-        <div className="bg-[#141414] p-4 rounded-xl border border-[#2A2A2A]">
-          <p className="text-sm text-gray-400">Total Units</p>
-          <p className="text-2xl font-bold text-white">
-            {inventory.reduce((sum, i) => sum + i.currentStock, 0).toLocaleString()}
-          </p>
-        </div>
-        <div className="bg-[#141414] p-4 rounded-xl border border-[#2A2A2A]">
-          <p className="text-sm text-gray-400">Available</p>
-          <p className="text-2xl font-bold text-[#22C55E]">
-            {inventory.reduce((sum, i) => sum + i.available, 0).toLocaleString()}
-          </p>
-        </div>
-      </div>
       
       {/* Inventory Table */}
       <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] overflow-hidden">
