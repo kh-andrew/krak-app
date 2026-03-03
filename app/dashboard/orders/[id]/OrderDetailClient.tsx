@@ -4,7 +4,7 @@ import React, { useRef, useState, useCallback } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 import { useRouter } from 'next/navigation';
 
-// Types
+// Types - matching the actual data structure from page.tsx
 interface AssignedTo {
   name: string | null;
   email: string;
@@ -12,12 +12,14 @@ interface AssignedTo {
 
 interface Delivery {
   id: string;
-  status: 'pending' | 'in_transit' | 'delivered' | 'failed' | 'cancelled';
+  deliveryAddress: string;
+  deliveryNotes: string | null;
   assignedTo: AssignedTo | null;
   signatureUrl: string | null;
   photoUrl: string | null;
   deliveredAt: string | null;
-  notes: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 interface Actor {
@@ -37,29 +39,35 @@ interface ActivityLog {
   actor: Actor | null;
 }
 
-interface OrderItem {
-  id: string;
-  productName: string;
+interface LineItem {
+  title: string;
   quantity: number;
-  price: number;
+  price: string;
+  sku: string | null;
 }
 
 interface Customer {
-  id: string;
-  name: string;
+  firstName: string | null;
+  lastName: string | null;
   email: string;
   phone: string | null;
-  address: string;
+  address: string | null;
+  city: string | null;
+  postalCode: string | null;
+  country: string | null;
 }
 
 interface Order {
   id: string;
-  orderNumber: string;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
-  total: number;
+  shopifyId: string;
+  shopifyOrderNumber: string | null;
+  status: string;
+  totalAmount: number;
+  currency: string;
+  lineItems: LineItem[];
   createdAt: string;
-  customer: Customer;
-  items: OrderItem[];
+  updatedAt: string;
+  customer: Customer | null;
   delivery: Delivery | null;
   activityLogs: ActivityLog[];
 }
@@ -81,10 +89,9 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [deliveryNotes, setDeliveryNotes] = useState(order.delivery?.notes || '');
+  const [deliveryNotes, setDeliveryNotes] = useState(order.delivery?.deliveryNotes || '');
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(order.delivery?.photoUrl || null);
   const [signatureData, setSignatureData] = useState<string | null>(order.delivery?.signatureUrl || null);
-  const [selectedStatus, setSelectedStatus] = useState<Delivery['status']>(order.delivery?.status || 'pending');
 
   const clearSignature = useCallback(() => {
     signatureRef.current?.clear();
@@ -113,23 +120,6 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
     fileInputRef.current?.click();
   }, []);
 
-  const handleStatusChange = useCallback(async (status: Delivery['status']) => {
-    setSelectedStatus(status);
-    
-    try {
-      const response = await fetch(`/api/orders/${order.id}/delivery/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-      
-      if (!response.ok) throw new Error('Failed to update status');
-      router.refresh();
-    } catch (error) {
-      console.error('Error updating status:', error);
-    }
-  }, [order.id, router]);
-
   const handleAssignDelivery = useCallback(async (userId: string) => {
     try {
       const response = await fetch(`/api/orders/${order.id}/delivery/assign`, {
@@ -144,7 +134,6 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
       console.error('Error assigning delivery:', error);
     }
   }, [order.id, router]);
-
   const handleCompleteDelivery = useCallback(async () => {
     if (!signatureData && !capturedPhoto) {
       alert('Please provide a signature or photo to complete delivery');
@@ -173,99 +162,108 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
     }
   }, [order.id, signatureData, capturedPhoto, deliveryNotes, router]);
 
+  // Status colors with good contrast for dark theme
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      in_transit: 'bg-blue-100 text-blue-800',
-      delivered: 'bg-green-100 text-green-800',
-      failed: 'bg-red-100 text-red-800',
-      cancelled: 'bg-gray-100 text-gray-800',
+      RECEIVED: 'bg-[#1A3A2F] text-[#22C55E] border border-[#22C55E]/30',
+      PREPARING: 'bg-[#1A2A3A] text-[#3B82F6] border border-[#3B82F6]/30',
+      OUT_FOR_DELIVERY: 'bg-[#3A2A1A] text-[#F59E0B] border border-[#F59E0B]/30',
+      DELIVERED: 'bg-[#1A3A2F] text-[#22C55E] border border-[#22C55E]/30',
+      FAILED: 'bg-[#3A1A1A] text-[#EF4444] border border-[#EF4444]/30',
     };
-    return colors[status] || 'bg-gray-100 text-gray-800';
+    return colors[status] || 'bg-[#2A2A2A] text-gray-300 border border-[#3A3A3A]';
   };
 
-  const getOrderStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      processing: 'bg-blue-100 text-blue-800',
-      shipped: 'bg-purple-100 text-purple-800',
-      delivered: 'bg-green-100 text-green-800',
-      cancelled: 'bg-red-100 text-red-800',
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
-  };
+  const customerName = order.customer 
+    ? `${order.customer.firstName || ''} ${order.customer.lastName || ''}`.trim() || 'Unknown'
+    : 'Unknown';
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="max-w-6xl mx-auto p-6 bg-[#0A0A0A] min-h-screen">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Order {order.orderNumber}</h1>
-            <p className="text-gray-500 mt-1">Created on {new Date(order.createdAt).toLocaleDateString()}</p>
+            <h1 className="text-3xl font-bold text-white">
+              Order {order.shopifyOrderNumber || order.shopifyId}
+            </h1>
+            <p className="text-gray-400 mt-1">
+              Created on {new Date(order.createdAt).toLocaleDateString()}
+            </p>
           </div>
-          <span className={`px-4 py-2 rounded-full text-sm font-medium ${getOrderStatusColor(order.status)}`}>
-            {order.status.replace('_', ' ').toUpperCase()}
+          <span className={`px-4 py-2 rounded-lg text-sm font-medium ${getStatusColor(order.status)}`}>
+            {order.status.replace(/_/g, ' ')}
           </span>
         </div>
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Left Column - Order Details */}
         <div className="space-y-6">
           {/* Customer Info */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Customer Information</h2>
-            <div className="space-y-2">
-              <p className="text-gray-700"><span className="font-medium">Name:</span> {order.customer.name}</p>
-              <p className="text-gray-700"><span className="font-medium">Email:</span> {order.customer.email}</p>
-              {order.customer.phone && (
-                <p className="text-gray-700"><span className="font-medium">Phone:</span> {order.customer.phone}</p>
+          <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-6">
+            <h2 className="text-lg font-semibold text-white mb-4">Customer Information</h2>
+            <div className="space-y-3">
+              <p className="text-gray-300">
+                <span className="text-gray-500">Name:</span> {customerName}
+              </p>
+              <p className="text-gray-300">
+                <span className="text-gray-500">Email:</span> {order.customer?.email || 'N/A'}
+              </p>
+              {order.customer?.phone && (
+                <p className="text-gray-300">
+                  <span className="text-gray-500">Phone:</span> {order.customer.phone}
+                </p>
               )}
-              <p className="text-gray-700"><span className="font-medium">Address:</span> {order.customer.address}</p>
+              <p className="text-gray-300">
+                <span className="text-gray-500">Address:</span>{' '}
+                {order.customer?.address || 'N/A'}
+                {order.customer?.city && `, ${order.customer.city}`}
+                {order.customer?.postalCode && ` ${order.customer.postalCode}`}
+                {order.customer?.country && `, ${order.customer.country}`}
+              </p>
             </div>
           </div>
 
           {/* Order Items */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Order Items</h2>
+          <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-6">
+            <h2 className="text-lg font-semibold text-white mb-4">Order Items</h2>
             <div className="space-y-3">
-              {order.items.map((item) => (
-                <div key={item.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
+              {order.lineItems.map((item, index) => (
+                <div key={index} className="flex justify-between items-center py-2 border-b border-[#2A2A2A] last:border-0">
                   <div>
-                    <p className="font-medium text-gray-900">{item.productName}</p>
-                    <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
+                    <p className="font-medium text-white">{item.title}</p>
+                    <p className="text-sm text-gray-400">Qty: {item.quantity} {item.sku && `• SKU: ${item.sku}`}</p>
                   </div>
-                  <p className="font-medium text-gray-900">${item.price.toFixed(2)}</p>
+                  <p className="font-medium text-white">${parseFloat(item.price).toFixed(2)}</p>
                 </div>
               ))}
-              <div className="flex justify-between items-center pt-3 border-t border-gray-200">
-                <p className="font-semibold text-gray-900">Total</p>
-                <p className="font-semibold text-gray-900">${order.total.toFixed(2)}</p>
+              <div className="flex justify-between items-center pt-3 border-t border-[#2A2A2A]">
+                <p className="font-semibold text-white">Total</p>
+                <p className="font-semibold text-white">${order.totalAmount.toFixed(2)} {order.currency}</p>
               </div>
             </div>
           </div>
 
           {/* Activity Log */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Activity Log</h2>
+          <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-6">
+            <h2 className="text-lg font-semibold text-white mb-4">Activity Log</h2>
             <div className="space-y-4 max-h-64 overflow-y-auto">
               {order.activityLogs.length === 0 ? (
-                <p className="text-gray-500 text-sm">No activity recorded yet.</p>
+                <p className="text-gray-400 text-sm">No activity recorded yet.</p>
               ) : (
                 order.activityLogs.map((log) => (
                   <div key={log.id} className="flex items-start space-x-3">
-                    <div className="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-blue-500" />
+                    <div className="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-[#FF6B4A]" />
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">{log.action}</p>
+                      <p className="text-sm font-medium text-white">{log.action}</p>
                       {log.fieldName && (
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-400">
                           {log.fieldName}: {log.oldValue || '—'} → {log.newValue || '—'}
                         </p>
                       )}
                       {log.notes && <p className="text-sm text-gray-500">{log.notes}</p>}
-                      <p className="text-xs text-gray-400 mt-1">
-                        by {log.actor?.name || log.actor?.email || 'Unknown'} • {new Date(log.createdAt).toLocaleString()}
+                      <p className="text-xs text-gray-500 mt-1">
+                        by {log.actor?.name || log.actor?.email || 'System'} • {new Date(log.createdAt).toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -276,108 +274,74 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
         </div>
 
         {/* Right Column - Delivery Management */}
-        <div className="space-y-6">
-          {/* Delivery Status */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Delivery Status</h2>
+              <div className="space-y-6">
+          {/* Delivery Info */}
+          <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-6">
+            <h2 className="text-lg font-semibold text-white mb-4">Delivery Information</h2>
             
             {order.delivery ? (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Current Status:</span>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.delivery.status)}`}>
-                    {order.delivery.status.replace('_', ' ').toUpperCase()}
-                  </span>
+                <div>
+                  <p className="text-gray-500 text-sm">Delivery Address</p>
+                  <p className="text-gray-300">{order.delivery.deliveryAddress}</p>
                 </div>
-
+                
                 {order.delivery.assignedTo && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Assigned To:</span>
-                    <span className="text-gray-900">
+                  <div>
+                    <p className="text-gray-500 text-sm">Assigned To</p>
+                    <p className="text-gray-300">
                       {order.delivery.assignedTo.name || order.delivery.assignedTo.email}
-                    </span>
+                    </p>
                   </div>
                 )}
 
-                {order.delivery.deliveredAt && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Delivered At:</span>
-                    <span className="text-gray-900">
-                      {new Date(order.delivery.deliveredAt).toLocaleString()}
-                    </span>
-                  </div>
-                )}
-
-                {/* Status Buttons */}
-                <div className="pt-4 border-t border-gray-200">
-                  <p className="text-sm font-medium text-gray-700 mb-3">Update Status:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {(['pending', 'in_transit', 'delivered', 'failed', 'cancelled'] as const).map((status) => (
+                {/* Assign Delivery */}
+                <div className="pt-4 border-t border-[#2A2A2A]">
+                  <p className="text-sm font-medium text-white mb-3">Assign to Driver:</p>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {users.map((user) => (
                       <button
-                        key={status}
-                        onClick={() => handleStatusChange(status)}
-                        disabled={selectedStatus === status}
-                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                          selectedStatus === status
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                            : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                        key={user.id}
+                        onClick={() => handleAssignDelivery(user.id)}
+                        className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                          order.delivery?.assignedTo?.email === user.email
+                            ? 'border-[#FF6B4A] bg-[#FF6B4A]/10'
+                            : 'border-[#2A2A2A] hover:border-[#3A3A3A] hover:bg-[#1A1A1A]'
                         }`}
                       >
-                        {status.replace('_', ' ')}
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 rounded-full bg-[#2A2A2A] flex items-center justify-center text-sm font-medium text-white">
+                            {(user.name || user.email).charAt(0).toUpperCase()}
+                          </div>
+                          <div className="text-left">
+                            <p className="font-medium text-white">{user.name || 'Unnamed User'}</p>
+                            <p className="text-sm text-gray-400">{user.email}</p>
+                          </div>
+                        </div>
+                        {order.delivery?.assignedTo?.email === user.email && (
+                          <span className="text-[#FF6B4A] text-sm font-medium">Assigned</span>
+                        )}
                       </button>
                     ))}
                   </div>
                 </div>
               </div>
             ) : (
-              <p className="text-gray-500">No delivery information available.</p>
+              <p className="text-gray-400">No delivery information available.</p>
             )}
           </div>
 
-          {/* Assign Delivery */}
-          {order.delivery && order.delivery.status !== 'delivered' && order.delivery.status !== 'cancelled' && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Assign Delivery</h2>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {users.map((user) => (
-                  <button
-                    key={user.id}
-                    onClick={() => handleAssignDelivery(user.id)}
-                    className={`w-full flex items-center justify-between p-3 rounded-md border transition-colors ${
-                      order.delivery?.assignedTo?.email === user.email
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600">
-                        {(user.name || user.email).charAt(0).toUpperCase()}
-                      </div>
-                      <div className="text-left">
-                        <p className="font-medium text-gray-900">{user.name || 'Unnamed User'}</p>
-                        <p className="text-sm text-gray-500">{user.email}</p>
-                      </div>
-                    </div>
-                    {order.delivery?.assignedTo?.email === user.email && (
-                      <span className="text-blue-600 text-sm font-medium">Assigned</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Delivery Completion - Signature & Photo */}
-          {order.delivery && order.delivery.status !== 'delivered' && order.delivery.status !== 'cancelled' && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Complete Delivery</h2>
+        {order.delivery && (
+            <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-6">
+              <h2 className="text-lg font-semibold text-white mb-4">Complete Delivery</h2>
               
               {/* Signature Pad */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
                   Customer Signature
                 </label>
-                <div className="border-2 border-gray-300 rounded-lg overflow-hidden bg-white">
+                <div className="border-2 border-[#2A2A2A] rounded-lg overflow-hidden bg-white">
                   <SignatureCanvas
                     ref={signatureRef}
                     canvasProps={{
@@ -389,128 +353,29 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
                 <div className="flex gap-2 mt-2">
                   <button
                     onClick={clearSignature}
-                    className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50"
+                    className="px-3 py-1.5 text-sm text-gray-400 hover:text-white border border-[#2A2A2A] rounded-lg hover:bg-[#1A1A1A]"
                   >
                     Clear
                   </button>
                   <button
                     onClick={saveSignature}
-                    className="px-3 py-1.5 text-sm text-blue-600 hover:text-blue-800 border border-blue-300 rounded-md hover:bg-blue-50"
+                    className="px-3 py-1.5 text-sm text-[#FF6B4A] hover:text-[#FF8566] border border-[#FF6B4A]/30 rounded-lg hover:bg-[#FF6B4A]/10"
                   >
                     Save Signature
                   </button>
                 </div>
                 {signatureData && (
-                  <p className="text-sm text-green-600 mt-2">✓ Signature captured</p>
+                  <p className="text-sm text-[#22C55E] mt-2">✓ Signature captured</p>
                 )}
               </div>
 
               {/* Photo Capture */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
                   Delivery Photo (Optional)
                 </label>
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
-                  capture="environment"
-                  onChange={handlePhotoCapture}
-                  className="hidden"
-                />
-                <button
-                  onClick={triggerCamera}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-colors"
-                >
-                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <span className="text-gray-600">Take Photo</span>
-                </button>
-                {capturedPhoto && (
-                  <div className="mt-3">
-                    <img
-                      src={capturedPhoto}
-                      alt="Delivery proof"
-                      className="w-full h-48 object-cover rounded-lg"
-                    />
-                    <button
-                      onClick={() => setCapturedPhoto(null)}
-                      className="text-sm text-red-600 hover:text-red-800 mt-2"
-                    >
-                      Remove photo
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Delivery Notes */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Delivery Notes
-                </label>
-                <textarea
-                  value={deliveryNotes}
-                  onChange={(e) => setDeliveryNotes(e.target.value)}
-                  placeholder="Add any notes about the delivery..."
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              {/* Complete Button */}
-              <button
-                onClick={handleCompleteDelivery}
-                disabled={isSubmitting || (!signatureData && !capturedPhoto)}
-                className={`w-full py-3 px-4 rounded-md font-medium text-white transition-colors ${
-                  isSubmitting || (!signatureData && !capturedPhoto)
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-green-600 hover:bg-green-700'
-                }`}
-              >
-                {isSubmitting ? 'Completing...' : 'Mark as Delivered'}
-              </button>
-            </div>
-          )}
-
-          {/* Delivery Proof Display (if already delivered) */}
-          {order.delivery?.status === 'delivered' && (order.delivery.signatureUrl || order.delivery.photoUrl) && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Delivery Proof</h2>
-              
-              {order.delivery.signatureUrl && (
-                <div className="mb-4">
-                  <p className="text-sm font-medium text-gray-700 mb-2">Signature</p>
-                  <img
-                    src={order.delivery.signatureUrl}
-                    alt="Customer signature"
-                    className="w-full h-48 object-contain border border-gray-200 rounded-lg bg-white"
-                  />
-                </div>
-              )}
-              
-              {order.delivery.photoUrl && (
-                <div>
-                  <p className="text-sm font-medium text-gray-700 mb-2">Photo</p>
-                  <img
-                    src={order.delivery.photoUrl}
-                    alt="Delivery photo"
-                    className="w-full h-48 object-cover rounded-lg"
-                  />
-                </div>
-              )}
-
-              {order.delivery.notes && (
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <p className="text-sm font-medium text-gray-700">Notes:</p>
-                  <p className="text-sm text-gray-600 mt-1">{order.delivery.notes}</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+                  capture="environment"        
