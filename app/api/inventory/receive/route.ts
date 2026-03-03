@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-helpers'
-
+ 
 // POST /api/inventory/receive
 // Receive stock with automatic component expansion
 export async function POST(req: Request) {
