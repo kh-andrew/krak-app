@@ -6,20 +6,19 @@ export default async function InventoryPage() {
   await requireAuth()
   
   let inventory: any[] = []
-  let error = null
-  
-  try {
-    inventory = await prisma.inventory.findMany({
-      orderBy: [
-        { available: 'asc' },
-        { productId: 'asc' }
-      ],
-      take: 100,
-    })
-  } catch (e) {
-    error = 'Failed to load inventory'
-    console.error('Inventory load error:', e)
-  }
+let error = null
+
+try {
+  const response = await fetch('https://krak-app.vercel.app/api/inventory', {
+    cache: 'no-store'
+  })
+  if (!response.ok) throw new Error('Failed to fetch')
+  inventory = await response.json()
+} catch (e) {
+  error = 'Failed to load inventory'
+  console.error('Inventory load error:', e)
+}
+
   
   const lowStockCount = inventory.filter((i: any) => 
     i.reorderPoint && i.available <= i.reorderPoint
