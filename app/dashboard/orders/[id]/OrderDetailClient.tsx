@@ -91,6 +91,7 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
   const [deliveryNotes, setDeliveryNotes] = useState(order.delivery?.deliveryNotes || '');
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(order.delivery?.photoUrl || null);
   const [signatureData, setSignatureData] = useState<string | null>(order.delivery?.signatureUrl || null);
+  const [activeTab, setActiveTab] = useState<'details' | 'delivery'>('details');
 
   const clearSignature = useCallback(() => {
     signatureRef.current?.clear();
@@ -178,253 +179,281 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
     : 'Unknown';
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-[#0A0A0A] min-h-screen">
-      <div className="mb-8">
+    <div className="min-h-screen bg-[#0A0A0A] pb-20">
+      {/* Header */}
+      <div className="bg-[#141414] border-b border-[#2A2A2A] px-4 py-4 sticky top-0 z-10">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-white">
-              Order {order.shopifyOrderNumber || order.shopifyId}
+            <h1 className="text-lg sm:text-2xl font-bold text-white">
+              Order {order.shopifyOrderNumber || order.shopifyId.slice(0, 8)}
             </h1>
-            <p className="text-gray-400 mt-1">
-              Created on {new Date(order.createdAt).toLocaleDateString()}
+            <p className="text-gray-400 text-sm">
+              {new Date(order.createdAt).toLocaleDateString()}
             </p>
           </div>
-          <span className={`px-4 py-2 rounded-lg text-sm font-medium ${getStatusColor(order.status)}`}>
+          <span className={`px-3 py-1 rounded-lg text-xs font-medium ${getStatusColor(order.status)}`}>
             {order.status.replace(/_/g, ' ')}
           </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="space-y-6">
-          <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Customer Information</h2>
-            <div className="space-y-3">
-              <p className="text-gray-300">
-                <span className="text-gray-500">Name:</span> {customerName}
-              </p>
-              <p className="text-gray-300">
-                <span className="text-gray-500">Email:</span> {order.customer?.email || 'N/A'}
-              </p>
-              {order.customer?.phone && (
-                <p className="text-gray-300">
-                  <span className="text-gray-500">Phone:</span> {order.customer.phone}
-                </p>
-              )}
-              <p className="text-gray-300">
-                <span className="text-gray-500">Address:</span>{' '}
-                {order.customer?.address || 'N/A'}
-                {order.customer?.city && `, ${order.customer.city}`}
-                {order.customer?.postalCode && ` ${order.customer.postalCode}`}
-                {order.customer?.country && `, ${order.customer.country}`}
-              </p>
-            </div>
-          </div>
+      {/* Mobile Tab Navigation */}
+      <div className="flex border-b border-[#2A2A2A] bg-[#141414]">
+        <button
+          onClick={() => setActiveTab('details')}
+          className={`flex-1 py-3 text-sm font-medium ${
+            activeTab === 'details'
+              ? 'text-[#FF6B4A] border-b-2 border-[#FF6B4A]'
+              : 'text-gray-400'
+          }`}
+        >
+          Details
+        </button>
+        <button
+          onClick={() => setActiveTab('delivery')}
+          className={`flex-1 py-3 text-sm font-medium ${
+            activeTab === 'delivery'
+              ? 'text-[#FF6B4A] border-b-2 border-[#FF6B4A]'
+              : 'text-gray-400'
+          }`}
+        >
+          Delivery
+        </button>
+      </div>
 
-          <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Order Items</h2>
-            <div className="space-y-3">
-              {order.lineItems.map((item, index) => (
-                <div key={index} className="flex justify-between items-center py-2 border-b border-[#2A2A2A] last:border-0">
-                  <div>
-                    <p className="font-medium text-white">{item.title}</p>
-                    <p className="text-sm text-gray-400">Qty: {item.quantity} {item.sku && `• SKU: ${item.sku}`}</p>
-                  </div>
-                  <p className="font-medium text-white">${parseFloat(item.price).toFixed(2)}</p>
-                </div>
-              ))}
-              <div className="flex justify-between items-center pt-3 border-t border-[#2A2A2A]">
-                <p className="font-semibold text-white">Total</p>
-                <p className="font-semibold text-white">${order.totalAmount.toFixed(2)} {order.currency}</p>
+      <div className="p-4 space-y-4">
+        {/* Details Tab */}
+        {activeTab === 'details' && (
+          <>
+            {/* Customer Info */}
+            <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-4">
+              <h2 className="text-base font-semibold text-white mb-3">Customer</h2>
+              <div className="space-y-2 text-sm">
+                <p className="text-white font-medium">{customerName}</p>
+                <p className="text-gray-400">{order.customer?.email}</p>
+                {order.customer?.phone && (
+                  <p className="text-gray-400">{order.customer.phone}</p>
+                )}
+                <p className="text-gray-500 text-xs mt-2">
+                  {order.customer?.address}
+                  {order.customer?.city && `, ${order.customer.city}`}
+                  {order.customer?.postalCode && ` ${order.customer.postalCode}`}
+                  {order.customer?.country && `, ${order.customer.country}`}
+                </p>
               </div>
             </div>
-          </div>
 
-          <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Activity Log</h2>
-            <div className="space-y-4 max-h-64 overflow-y-auto">
-              {order.activityLogs.length === 0 ? (
-                <p className="text-gray-400 text-sm">No activity recorded yet.</p>
-              ) : (
-                order.activityLogs.map((log) => (
-                  <div key={log.id} className="flex items-start space-x-3">
-                    <div className="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-[#FF6B4A]" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-white">{log.action}</p>
-                      {log.fieldName && (
-                        <p className="text-sm text-gray-400">
-                          {log.fieldName}: {log.oldValue || '—'} → {log.newValue || '—'}
+            {/* Order Items */}
+            <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-4">
+              <h2 className="text-base font-semibold text-white mb-3">Items</h2>
+              <div className="space-y-3">
+                {order.lineItems.map((item, index) => (
+                  <div key={index} className="flex justify-between items-start py-2 border-b border-[#2A2A2A] last:border-0">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white truncate">{item.title}</p>
+                      <p className="text-xs text-gray-400">Qty: {item.quantity} {item.sku && `• ${item.sku}`}</p>
+                    </div>
+                    <p className="text-sm text-white ml-4">${parseFloat(item.price).toFixed(2)}</p>
+                  </div>
+                ))}
+                <div className="flex justify-between items-center pt-3">
+                  <p className="font-semibold text-white">Total</p>
+                  <p className="font-semibold text-white">${order.totalAmount.toFixed(2)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Activity Log */}
+            <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-4">
+              <h2 className="text-base font-semibold text-white mb-3">Activity</h2>
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {order.activityLogs.length === 0 ? (
+                  <p className="text-gray-400 text-sm">No activity yet.</p>
+                ) : (
+                  order.activityLogs.map((log) => (
+                    <div key={log.id} className="flex items-start space-x-2">
+                      <div className="w-1.5 h-1.5 mt-2 rounded-full bg-[#FF6B4A] flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-white">{log.action}</p>
+                        {log.notes && <p className="text-xs text-gray-500">{log.notes}</p>}
+                        <p className="text-xs text-gray-500 mt-1">
+                          {log.actor?.name || 'System'} • {new Date(log.createdAt).toLocaleDateString()}
                         </p>
-                      )}
-                      {log.notes && <p className="text-sm text-gray-500">{log.notes}</p>}
-                      <p className="text-xs text-gray-500 mt-1">
-                        by {log.actor?.name || log.actor?.email || 'System'} • {new Date(log.createdAt).toLocaleString()}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Delivery Tab */}
+        {activeTab === 'delivery' && (
+          <>
+            {/* Delivery Info */}
+            <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-4">
+              <h2 className="text-base font-semibold text-white mb-3">Delivery Info</h2>
+              
+              {order.delivery ? (
+                <div className="space-y-3 text-sm">
+                  <div>
+                    <p className="text-gray-500 text-xs">Address</p>
+                    <p className="text-gray-300">{order.delivery.deliveryAddress}</p>
+                  </div>
+                  
+                  {order.delivery.assignedTo && (
+                    <div>
+                      <p className="text-gray-500 text-xs">Assigned To</p>
+                      <p className="text-gray-300">
+                        {order.delivery.assignedTo.name || order.delivery.assignedTo.email}
                       </p>
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
+                  )}
 
-        <div className="space-y-6">
-          <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Delivery Information</h2>
-            
-            {order.delivery ? (
-              <div className="space-y-4">
-                <div>
-                  <p className="text-gray-500 text-sm">Delivery Address</p>
-                  <p className="text-gray-300">{order.delivery.deliveryAddress}</p>
-                </div>
-                
-                {order.delivery.assignedTo && (
-                  <div>
-                    <p className="text-gray-500 text-sm">Assigned To</p>
-                    <p className="text-gray-300">
-                      {order.delivery.assignedTo.name || order.delivery.assignedTo.email}
-                    </p>
-                  </div>
-                )}
-
-                <div className="pt-4 border-t border-[#2A2A2A]">
-                  <p className="text-sm font-medium text-white mb-3">Assign to Driver:</p>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {users.map((user) => (
-                      <button
-                        key={user.id}
-                        onClick={() => handleAssignDelivery(user.id)}
-                        className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                          order.delivery?.assignedTo?.email === user.email
-                            ? 'border-[#FF6B4A] bg-[#FF6B4A]/10'
-                            : 'border-[#2A2A2A] hover:border-[#3A3A3A] hover:bg-[#1A1A1A]'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 rounded-full bg-[#2A2A2A] flex items-center justify-center text-sm font-medium text-white">
+                  {/* Assign Driver */}
+                  <div className="pt-3 border-t border-[#2A2A2A]">
+                    <p className="text-sm font-medium text-white mb-2">Assign Driver</p>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {users.map((user) => (
+                        <button
+                          key={user.id}
+                          onClick={() => handleAssignDelivery(user.id)}
+                          className={`w-full flex items-center space-x-3 p-3 rounded-lg border transition-colors ${
+                            order.delivery?.assignedTo?.email === user.email
+                              ? 'border-[#FF6B4A] bg-[#FF6B4A]/10'
+                              : 'border-[#2A2A2A] hover:border-[#3A3A3A]'
+                          }`}
+                        >
+                          <div className="w-8 h-8 rounded-full bg-[#2A2A2A] flex items-center justify-center text-sm font-medium text-white flex-shrink-0">
                             {(user.name || user.email).charAt(0).toUpperCase()}
                           </div>
-                          <div className="text-left">
-                            <p className="font-medium text-white">{user.name || 'Unnamed User'}</p>
-                            <p className="text-sm text-gray-400">{user.email}</p>
+                          <div className="flex-1 text-left min-w-0">
+                            <p className="text-sm text-white truncate">{user.name || 'Unnamed'}</p>
+                            <p className="text-xs text-gray-400 truncate">{user.email}</p>
                           </div>
-                        </div>
-                        {order.delivery?.assignedTo?.email === user.email && (
-                          <span className="text-[#FF6B4A] text-sm font-medium">Assigned</span>
-                        )}
-                      </button>
-                    ))}
+                          {order.delivery?.assignedTo?.email === user.email && (
+                            <span className="text-[#FF6B4A] text-xs font-medium flex-shrink-0">Assigned</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <p className="text-gray-400">No delivery information available.</p>
-            )}
-          </div>
+              ) : (
+                <p className="text-gray-400 text-sm">No delivery info available.</p>
+              )}
+            </div>
 
-          {order.delivery && (
-            <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-6">
-              <h2 className="text-lg font-semibold text-white mb-4">Complete Delivery</h2>
-              
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Customer Signature
-                </label>
-                <div className="border-2 border-[#2A2A2A] rounded-lg overflow-hidden bg-white">
-                  <SignatureCanvas
-                    ref={signatureRef}
-                    canvasProps={{
-                      className: 'w-full h-48 cursor-crosshair',
-                    }}
-                    backgroundColor="white"
-                  />
-                </div>
-                <div className="flex gap-2 mt-2">
-                  <button
-                    onClick={clearSignature}
-                    className="px-3 py-1.5 text-sm text-gray-400 hover:text-white border border-[#2A2A2A] rounded-lg hover:bg-[#1A1A1A]"
-                  >
-                    Clear
-                  </button>
-                  <button
-                    onClick={saveSignature}
-                    className="px-3 py-1.5 text-sm text-[#FF6B4A] hover:text-[#FF8566] border border-[#FF6B4A]/30 rounded-lg hover:bg-[#FF6B4A]/10"
-                  >
-                    Save Signature
-                  </button>
-                </div>
-                {signatureData && (
-                  <p className="text-sm text-[#22C55E] mt-2">✓ Signature captured</p>
-                )}
-              </div>
-
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Delivery Photo (Optional)
-                </label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={handlePhotoCapture}
-                  className="hidden"
-                />
-                <button
-                  onClick={triggerCamera}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-[#2A2A2A] rounded-lg hover:border-[#3A3A3A] hover:bg-[#1A1A1A] transition-colors"
-                >
-                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <span className="text-gray-400">Take Photo</span>
-                </button>
-                {capturedPhoto && (
-                  <div className="mt-3">
-                    <img
-                      src={capturedPhoto}
-                      alt="Delivery proof"
-                      className="w-full h-48 object-cover rounded-lg"
+            {/* Complete Delivery */}
+            {order.delivery && (
+              <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-4">
+                <h2 className="text-base font-semibold text-white mb-4">Complete Delivery</h2>
+                
+                {/* Signature Pad - Full width on mobile */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Customer Signature
+                  </label>
+                  <div className="border-2 border-[#2A2A2A] rounded-lg overflow-hidden bg-white touch-none">
+                    <SignatureCanvas
+                      ref={signatureRef}
+                      canvasProps={{
+                        className: 'w-full h-40 touch-none',
+                        style: { touchAction: 'none' }
+                      }}
+                      backgroundColor="white"
                     />
+                  </div>
+                  <div className="flex gap-2 mt-2">
                     <button
-                      onClick={() => setCapturedPhoto(null)}
-                      className="text-sm text-[#EF4444] hover:text-[#FF6B4A] mt-2"
+                      onClick={clearSignature}
+                      className="flex-1 px-3 py-2 text-sm text-gray-400 border border-[#2A2A2A] rounded-lg"
                     >
-                      Remove photo
+                      Clear
+                    </button>
+                    <button
+                      onClick={saveSignature}
+                      className="flex-1 px-3 py-2 text-sm text-[#FF6B4A] border border-[#FF6B4A]/30 rounded-lg"
+                    >
+                      Save
                     </button>
                   </div>
-                )}
-              </div>
+                  {signatureData && (
+                    <p className="text-sm text-[#22C55E] mt-2">✓ Signature saved</p>
+                  )}
+                </div>
 
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Delivery Notes
-                </label>
-                <textarea
-                  value={deliveryNotes}
-                  onChange={(e) => setDeliveryNotes(e.target.value)}
-                  placeholder="Add any notes about the delivery..."
-                  rows={3}
-                  className="w-full px-3 py-2 bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#FF6B4A] focus:border-transparent"
-                />
-              </div>
+                {/* Photo Capture */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Delivery Photo
+                  </label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handlePhotoCapture}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={triggerCamera}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-[#2A2A2A] rounded-lg"
+                  >
+                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span className="text-gray-400">Take Photo</span>
+                  </button>
+                  {capturedPhoto && (
+                    <div className="mt-3">
+                      <img
+                        src={capturedPhoto}
+                        alt="Delivery"
+                        className="w-full h-48 object-cover rounded-lg"
+                      />
+                      <button
+                        onClick={() => setCapturedPhoto(null)}
+                        className="text-sm text-[#EF4444] mt-2"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
 
-              <button
-                onClick={handleCompleteDelivery}
-                disabled={isSubmitting || (!signatureData && !capturedPhoto)}
-                className={`w-full py-3 px-4 rounded-lg font-medium text-white transition-colors ${
-                  isSubmitting || (!signatureData && !capturedPhoto)
-                    ? 'bg-gray-600 cursor-not-allowed'
-                    : 'bg-[#22C55E] hover:bg-[#16A34A]'
-                }`}
-              >
-                {isSubmitting ? 'Completing...' : 'Mark as Delivered'}
-              </button>
-            </div>
-          )}
-        </div>
+                {/* Notes */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Notes
+                  </label>
+                  <textarea
+                    value={deliveryNotes}
+                    onChange={(e) => setDeliveryNotes(e.target.value)}
+                    placeholder="Add notes..."
+                    rows={3}
+                    className="w-full px-3 py-2 bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg text-white text-sm"
+                  />
+                </div>
+
+                {/* Complete Button */}
+                <button
+                  onClick={handleCompleteDelivery}
+                  disabled={isSubmitting || (!signatureData && !capturedPhoto)}
+                  className={`w-full py-3 px-4 rounded-lg font-medium text-white ${
+                    isSubmitting || (!signatureData && !capturedPhoto)
+                      ? 'bg-gray-600'
+                      : 'bg-[#22C55E]'
+                  }`}
+                >
+                  {isSubmitting ? 'Completing...' : 'Mark Delivered'}
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
