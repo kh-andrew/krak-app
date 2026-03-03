@@ -25,7 +25,7 @@ export async function GET() {
       ORDER BY i.available ASC
       LIMIT 100
     `
-    
+     
     return NextResponse.json(inventory || [])
     
   } catch (error) {
