@@ -144,20 +144,47 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
     setIsSubmitting(true);
     
     try {
-      const response = await fetch(`/api/orders/${order.id}/delivery/complete`, {
+      // Convert base64 signature to blob
+      let signatureBlob: Blob | null = null;
+      if (signatureData) {
+        const base64Response = await fetch(signatureData);
+        signatureBlob = await base64Response.blob();
+      }
+
+      // Convert base64 photo to blob
+      let photoBlob: Blob | null = null;
+      if (capturedPhoto) {
+        const base64Response = await fetch(capturedPhoto);
+        photoBlob = await base64Response.blob();
+      }
+
+      // Create FormData
+      const formData = new FormData();
+      formData.append('action', 'complete');
+      if (signatureBlob) {
+        formData.append('signatureDataUrl', signatureData as string);
+      }
+      if (photoBlob) {
+        formData.append('photo', photoBlob, 'delivery-photo.jpg');
+      }
+      if (deliveryNotes) {
+        formData.append('notes', deliveryNotes);
+      }
+
+      const response = await fetch(`/api/orders/${order.id}/delivery`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          signatureUrl: signatureData,
-          photoUrl: capturedPhoto,
-          notes: deliveryNotes,
-        }),
+        body: formData,
       });
       
-      if (!response.ok) throw new Error('Failed to complete delivery');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to complete delivery');
+      }
+      
       router.refresh();
     } catch (error) {
       console.error('Error completing delivery:', error);
+      alert(error instanceof Error ? error.message : 'Failed to complete delivery');
     } finally {
       setIsSubmitting(false);
     }
@@ -458,4 +485,3 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
     </div>
   );
 }
-
