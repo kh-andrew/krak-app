@@ -1,24 +1,24 @@
 import { requireAuth } from '@/lib/auth-helpers'
 import Link from 'next/link'
+import QuickReceiveStock from './components/QuickReceiveStock'
 
 export default async function InventoryPage() {
   await requireAuth()
   
   let inventory: any[] = []
-let error = null
+  let error = null
 
-try {
-  const response = await fetch('https://krak-app.vercel.app/api/inventory', {
-    cache: 'no-store'
-  })
-  if (!response.ok) throw new Error('Failed to fetch')
-  inventory = await response.json()
-} catch (e) {
-  error = 'Failed to load inventory'
-  console.error('Inventory load error:', e)
-}
+  try {
+    const response = await fetch('https://krak-app.vercel.app/api/inventory', {
+      cache: 'no-store'
+    })
+    if (!response.ok) throw new Error('Failed to fetch')
+    inventory = await response.json()
+  } catch (e) {
+    error = 'Failed to load inventory'
+    console.error('Inventory load error:', e)
+  }
 
-  
   const lowStockCount = inventory.filter((i: any) => 
     i.reorderPoint && i.available <= i.reorderPoint
   ).length
@@ -78,8 +78,11 @@ try {
             <p className="text-2xl font-bold text-[#22C55E]">{totalAvailable.toLocaleString()}</p>
           </div>
         </div>
+
+        {/* Receive Stock Form */}
+        <QuickReceiveStock />
         
-        {/* Inventory List - Card Style for Mobile */}
+        {/* Inventory List */}
         <div className="space-y-3">
           {inventory.length === 0 ? (
             <div className="text-center py-12 text-gray-400 bg-[#141414] rounded-xl border border-[#2A2A2A]">
