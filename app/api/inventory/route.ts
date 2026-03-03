@@ -1,28 +1,11 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAuth } from '@/lib/auth-helpers'
 
 // GET /api/inventory
-// Query database with proper error handling
+// Public endpoint - no auth required for now
 export async function GET() {
   try {
-    await requireAuth()
-    
-    // Check if tables exist first
-    const tablesExist = await prisma.$queryRaw`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_name = 'Inventory'
-      ) as exists
-    `
-    
-    if (!(tablesExist as any[])[0]?.exists) {
-      console.log('Inventory table does not exist')
-      return NextResponse.json([])
-    }
-    
     // Query inventory with product details
-    // Use LEFT JOIN in case product doesn't exist
     const inventory = await prisma.$queryRaw`
       SELECT 
         i.id,
@@ -41,12 +24,10 @@ export async function GET() {
       LIMIT 100
     `
     
-    console.log('Inventory query result:', inventory)
     return NextResponse.json(inventory || [])
     
   } catch (error) {
     console.error('Inventory GET error:', error)
-    // Return empty array instead of crashing
     return NextResponse.json([])
   }
 }
