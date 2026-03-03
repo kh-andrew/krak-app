@@ -1,24 +1,15 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-helpers'
- 
+
 // POST /api/inventory/receive
-// Receive stock with automatic component expansion
+// Receive stock with batch tracking - uses raw SQL for compatibility
 export async function POST(req: Request) {
   const session = await requireAuth()
   
   try {
     const body = await req.json()
-    const { 
-      sku, 
-      quantity, 
-      batchCode, 
-      locationCode = 'WH-HK-01',
-      unitCost,
-      notes,
-      manufacturedDate,
-      expiryDate
-    } = body
+    const { sku, quantity, batchCode, notes } = body
 
     if (!sku || !quantity || quantity <= 0) {
       return NextResponse.json(
@@ -27,22 +18,11 @@ export async function POST(req: Request) {
       )
     }
 
-    // Find product with active bundle components
-    const product = await prisma.product.findUnique({
-      where: { sku },
-      include: {
-        bundleComponents: {
-          where: {
-            isActive: true,
-            effectiveFrom: { lte: new Date() },
-            OR: [
-              { effectiveTo: null },
-              { effectiveTo: { gte: new Date() } }
-            ]
-          }
-        }
-      }
-    })
+    // Find product using raw SQL with correct table name
+    const productResult = await prisma.$queryRaw`
+      SELECT id, sku, name FROM product WHERE sku = ${sku.toUpperCase()} LIMIT 1
+    `
+    const product = (productResult as any[])[0]
 
     if (!product) {
       return NextResponse.json(
@@ -51,123 +31,141 @@ export async function POST(req: Request) {
       )
     }
 
-    // Find location
-    const location = await prisma.location.findUnique({
-      where: { code: locationCode }
-    })
+    // Get default location
+    const locationResult = await prisma.$queryRaw`
+      SELECT id FROM location WHERE code = 'WH-HK-01' LIMIT 1
+    `
+    const location = (locationResult as any[])[0]
 
     if (!location) {
       return NextResponse.json(
-        { error: `Location ${locationCode} not found` },
+        { error: 'Default location not found' },
         { status: 404 }
       )
     }
 
-    // Start transaction
+    // Find bundle components
+    const componentsResult = await prisma.$queryRaw`
+      SELECT child_sku, quantity 
+      FROM bundle_component 
+      WHERE parent_sku = ${sku.toUpperCase()} AND is_active = true
+    `
+    const bundleComponents = componentsResult as any[]
+
+    // Execute transaction
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Update received SKU inventory
-      const inventory = await tx.inventory.upsert({
-        where: {
-          productId_locationId: {
-            productId: product.id,
-            locationId: location.id
+      // Update or create inventory for received SKU
+      const existingInv = await tx.$queryRaw`
+        SELECT id FROM inventory 
+        WHERE product_id = ${product.id} AND location_id = ${location.id}
+        LIMIT 1
+      `
+
+      if ((existingInv as any[]).length > 0) {
+        await tx.$executeRaw`
+          UPDATE inventory 
+          SET current_stock = current_stock + ${quantity},
+              available = available + ${quantity},
+              last_movement_at = NOW()
+          WHERE product_id = ${product.id} AND location_id = ${location.id}
+        `
+      } else {
+        await tx.$executeRaw`
+          INSERT INTO inventory (
+            product_id, location_id, current_stock, available, 
+            reorder_point, reorder_qty
+          ) VALUES (
+            ${product.id}, ${location.id}, ${quantity}, ${quantity},
+            ${sku === 'KFSS' ? 500 : sku === 'KFSP' ? 50 : 5},
+            ${sku === 'KFSS' ? 1000 : sku === 'KFSP' ? 100 : 10}
+          )
+        `
+      }
+
+      // Log movement
+      await tx.$executeRaw`
+        INSERT INTO inventory_movement (
+          inventory_id, type, quantity, reason, performed_by, notes, created_at
+        ) VALUES (
+          (SELECT id FROM inventory WHERE product_id = ${product.id} AND location_id = ${location.id} LIMIT 1),
+          'in', ${quantity}, 'receipt', 
+          ${session.user.id}, ${notes || `Received ${quantity} ${sku}`}, NOW()
+        )
+      `
+
+      // If bundle, expand to components
+      if (bundleComponents.length > 0) {
+        for (const component of bundleComponents) {
+          const componentProduct = await tx.$queryRaw`
+            SELECT id FROM product WHERE sku = ${component.child_sku} LIMIT 1
+          `
+          
+          if (!(componentProduct as any[])[0]) continue
+          
+          const componentId = (componentProduct as any[])[0].id
+          const componentQty = quantity * component.quantity
+
+          // Update component inventory
+          const existingComponent = await tx.$queryRaw`
+            SELECT id FROM inventory 
+            WHERE product_id = ${componentId} AND location_id = ${location.id}
+            LIMIT 1
+          `
+
+          if ((existingComponent as any[]).length > 0) {
+            await tx.$executeRaw`
+              UPDATE inventory 
+              SET current_stock = current_stock + ${componentQty},
+                  available = available + ${componentQty},
+                  last_movement_at = NOW()
+              WHERE product_id = ${componentId} AND location_id = ${location.id}
+            `
+          } else {
+            await tx.$executeRaw`
+              INSERT INTO inventory (
+                product_id, location_id, current_stock, available,
+                reorder_point, reorder_qty
+              ) VALUES (
+                ${componentId}, ${location.id}, ${componentQty}, ${componentQty},
+                ${component.child_sku === 'KFSS' ? 500 : 50},
+                ${component.child_sku === 'KFSS' ? 1000 : 100}
+              )
+            `
           }
-        },
-        update: {
-          currentStock: { increment: quantity },
-          lastMovementAt: new Date()
-        },
-        create: {
-          productId: product.id,
-          locationId: location.id,
-          currentStock: quantity,
-          reorderPoint: sku === 'KFSS' ? 500 : sku === 'KFSP' ? 50 : 5,
-          reorderQty: sku === 'KFSS' ? 1000 : sku === 'KFSP' ? 100 : 10
-        }
-      })
 
-      // 2. Log movement for received SKU
-      await tx.inventoryMovement.create({
-        data: {
-          inventoryId: inventory.id,
-          type: 'in',
-          quantity: quantity,
-          reason: 'receipt',
-          performedBy: session.user.id,
-          notes: notes || `Received ${quantity} ${sku}`
-        }
-      })
-
-      // 3. If this is a bundle (KFSP or KFSB), expand to components
-      if (product.bundleComponents && product.bundleComponents.length > 0) {
-        for (const component of product.bundleComponents as any[]) {
-          const componentProduct = await tx.product.findUnique({
-            where: { sku: component.sku }
-          })
-
-          if (!componentProduct) continue
-
-          const componentQty = quantity * component.qty
-
-          // Update component inventory with version tracking
-          const componentInventory = await tx.inventory.upsert({
-            where: {
-              productId_locationId: {
-                productId: componentProduct.id,
-                locationId: location.id
-              }
-            },
-            update: {
-              currentStock: { increment: componentQty },
-              lastMovementAt: new Date()
-            },
-            create: {
-              productId: componentProduct.id,
-              locationId: location.id,
-              currentStock: componentQty,
-              reorderPoint: component.childSku === 'KFSS' ? 500 : 50,
-              reorderQty: component.childSku === 'KFSS' ? 1000 : 100
-            }
-          })
-
-          // Log component movement with version info
-          await tx.inventoryMovement.create({
-            data: {
-              inventoryId: componentInventory.id,
-              type: 'conversion',
-              quantity: componentQty,
-              reason: 'bundle_break',
-              sourceSku: sku,
-              targetSku: component.childSku,
-              conversionRatio: component.quantity,
-              performedBy: session.user.id,
-              notes: `Converted from ${quantity} ${sku} (v${component.version || '1'})`
-            }
-          })
+          // Log component movement
+          await tx.$executeRaw`
+            INSERT INTO inventory_movement (
+              inventory_id, type, quantity, reason, source_sku, target_sku, 
+              conversion_ratio, performed_by, notes, created_at
+            ) VALUES (
+              (SELECT id FROM inventory WHERE product_id = ${componentId} AND location_id = ${location.id} LIMIT 1),
+              'conversion', ${componentQty}, 'bundle_break',
+              ${sku}, ${component.child_sku}, ${component.quantity},
+              ${session.user.id}, ${`Converted from ${quantity} ${sku}`}, NOW()
+            )
+          `
         }
       }
 
-      // 4. Create batch if batchCode provided
+      // Create batch if provided
       if (batchCode) {
-        await tx.batch.create({
-          data: {
-            batchCode,
-            productId: product.id,
-            locationId: location.id,
-            initialQty: quantity,
-            remainingQty: quantity,
-            manufacturedAt: manufacturedDate ? new Date(manufacturedDate) : new Date(),
-            expiryDate: expiryDate ? new Date(expiryDate) : null,
-            status: 'active'
-          }
-        })
+        await tx.$executeRaw`
+          INSERT INTO batch (
+            batch_code, product_id, location_id, initial_qty, remaining_qty, 
+            status, created_at
+          ) VALUES (
+            ${batchCode.toUpperCase()}, ${product.id}, ${location.id}, 
+            ${quantity}, ${quantity}, 'active', NOW()
+          )
+        `
       }
 
       return { 
         success: true, 
         sku, 
         quantity,
-        expanded: product.bundleComponents?.length > 0 
+        expanded: bundleComponents.length > 0 
       }
     })
 
@@ -176,7 +174,7 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error('Receive stock error:', error)
     return NextResponse.json(
-      { error: 'Failed to receive stock' },
+      { error: 'Failed to receive stock', details: String(error) },
       { status: 500 }
     )
   }
