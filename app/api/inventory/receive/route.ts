@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-helpers'
 
 // POST /api/inventory/receive
-// Receive stock with batch tracking - uses raw SQL for compatibility
+// Receive stock with batch tracking - uses correct table names
 export async function POST(req: Request) {
   const session = await requireAuth()
   
@@ -18,9 +18,9 @@ export async function POST(req: Request) {
       )
     }
 
-    // Find product using raw SQL with correct table name
+    // Find product using correct table name
     const productResult = await prisma.$queryRaw`
-      SELECT id, sku, name FROM product WHERE sku = ${sku.toUpperCase()} LIMIT 1
+      SELECT id, sku, name FROM "Product" WHERE sku = ${sku.toUpperCase()} LIMIT 1
     `
     const product = (productResult as any[])[0]
 
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
 
     // Get default location
     const locationResult = await prisma.$queryRaw`
-      SELECT id FROM location WHERE code = 'WH-HK-01' LIMIT 1
+      SELECT id FROM "Location" WHERE code = 'WH-HK-01' LIMIT 1
     `
     const location = (locationResult as any[])[0]
 
@@ -46,9 +46,9 @@ export async function POST(req: Request) {
 
     // Find bundle components
     const componentsResult = await prisma.$queryRaw`
-      SELECT child_sku, quantity 
-      FROM bundle_component 
-      WHERE parent_sku = ${sku.toUpperCase()} AND is_active = true
+      SELECT "childSku", quantity 
+      FROM "BundleComponent" 
+      WHERE "parentSku" = ${sku.toUpperCase()} AND "isActive" = true
     `
     const bundleComponents = componentsResult as any[]
 
@@ -56,24 +56,24 @@ export async function POST(req: Request) {
     const result = await prisma.$transaction(async (tx) => {
       // Update or create inventory for received SKU
       const existingInv = await tx.$queryRaw`
-        SELECT id FROM inventory 
-        WHERE product_id = ${product.id} AND location_id = ${location.id}
+        SELECT id FROM "Inventory" 
+        WHERE "productId" = ${product.id} AND "locationId" = ${location.id}
         LIMIT 1
       `
 
       if ((existingInv as any[]).length > 0) {
         await tx.$executeRaw`
-          UPDATE inventory 
-          SET current_stock = current_stock + ${quantity},
-              available = available + ${quantity},
-              last_movement_at = NOW()
-          WHERE product_id = ${product.id} AND location_id = ${location.id}
+          UPDATE "Inventory" 
+          SET "currentStock" = "currentStock" + ${quantity},
+              "available" = "available" + ${quantity},
+              "lastMovementAt" = NOW()
+          WHERE "productId" = ${product.id} AND "locationId" = ${location.id}
         `
       } else {
         await tx.$executeRaw`
-          INSERT INTO inventory (
-            product_id, location_id, current_stock, available, 
-            reorder_point, reorder_qty
+          INSERT INTO "Inventory" (
+            "productId", "locationId", "currentStock", "available", 
+            "reorderPoint", "reorderQty"
           ) VALUES (
             ${product.id}, ${location.id}, ${quantity}, ${quantity},
             ${sku === 'KFSS' ? 500 : sku === 'KFSP' ? 50 : 5},
@@ -84,10 +84,10 @@ export async function POST(req: Request) {
 
       // Log movement
       await tx.$executeRaw`
-        INSERT INTO inventory_movement (
-          inventory_id, type, quantity, reason, performed_by, notes, created_at
+        INSERT INTO "InventoryMovement" (
+          "inventoryId", type, quantity, reason, "performedBy", notes, "createdAt"
         ) VALUES (
-          (SELECT id FROM inventory WHERE product_id = ${product.id} AND location_id = ${location.id} LIMIT 1),
+          (SELECT id FROM "Inventory" WHERE "productId" = ${product.id} AND "locationId" = ${location.id} LIMIT 1),
           'in', ${quantity}, 'receipt', 
           ${session.user.id}, ${notes || `Received ${quantity} ${sku}`}, NOW()
         )
@@ -97,7 +97,7 @@ export async function POST(req: Request) {
       if (bundleComponents.length > 0) {
         for (const component of bundleComponents) {
           const componentProduct = await tx.$queryRaw`
-            SELECT id FROM product WHERE sku = ${component.child_sku} LIMIT 1
+            SELECT id FROM "Product" WHERE sku = ${component.childSku} LIMIT 1
           `
           
           if (!(componentProduct as any[])[0]) continue
@@ -107,41 +107,41 @@ export async function POST(req: Request) {
 
           // Update component inventory
           const existingComponent = await tx.$queryRaw`
-            SELECT id FROM inventory 
-            WHERE product_id = ${componentId} AND location_id = ${location.id}
+            SELECT id FROM "Inventory" 
+            WHERE "productId" = ${componentId} AND "locationId" = ${location.id}
             LIMIT 1
           `
 
           if ((existingComponent as any[]).length > 0) {
             await tx.$executeRaw`
-              UPDATE inventory 
-              SET current_stock = current_stock + ${componentQty},
-                  available = available + ${componentQty},
-                  last_movement_at = NOW()
-              WHERE product_id = ${componentId} AND location_id = ${location.id}
+              UPDATE "Inventory" 
+              SET "currentStock" = "currentStock" + ${componentQty},
+                  "available" = "available" + ${componentQty},
+                  "lastMovementAt" = NOW()
+              WHERE "productId" = ${componentId} AND "locationId" = ${location.id}
             `
           } else {
             await tx.$executeRaw`
-              INSERT INTO inventory (
-                product_id, location_id, current_stock, available,
-                reorder_point, reorder_qty
+              INSERT INTO "Inventory" (
+                "productId", "locationId", "currentStock", "available",
+                "reorderPoint", "reorderQty"
               ) VALUES (
                 ${componentId}, ${location.id}, ${componentQty}, ${componentQty},
-                ${component.child_sku === 'KFSS' ? 500 : 50},
-                ${component.child_sku === 'KFSS' ? 1000 : 100}
+                ${component.childSku === 'KFSS' ? 500 : 50},
+                ${component.childSku === 'KFSS' ? 1000 : 100}
               )
             `
           }
 
           // Log component movement
           await tx.$executeRaw`
-            INSERT INTO inventory_movement (
-              inventory_id, type, quantity, reason, source_sku, target_sku, 
-              conversion_ratio, performed_by, notes, created_at
+            INSERT INTO "InventoryMovement" (
+              "inventoryId", type, quantity, reason, "sourceSku", "targetSku", 
+              "conversionRatio", "performedBy", notes, "createdAt"
             ) VALUES (
-              (SELECT id FROM inventory WHERE product_id = ${componentId} AND location_id = ${location.id} LIMIT 1),
+              (SELECT id FROM "Inventory" WHERE "productId" = ${componentId} AND "locationId" = ${location.id} LIMIT 1),
               'conversion', ${componentQty}, 'bundle_break',
-              ${sku}, ${component.child_sku}, ${component.quantity},
+              ${sku}, ${component.childSku}, ${component.quantity},
               ${session.user.id}, ${`Converted from ${quantity} ${sku}`}, NOW()
             )
           `
@@ -151,9 +151,9 @@ export async function POST(req: Request) {
       // Create batch if provided
       if (batchCode) {
         await tx.$executeRaw`
-          INSERT INTO batch (
-            batch_code, product_id, location_id, initial_qty, remaining_qty, 
-            status, created_at
+          INSERT INTO "Batch" (
+            "batchCode", "productId", "locationId", "initialQty", "remainingQty", 
+            status, "createdAt"
           ) VALUES (
             ${batchCode.toUpperCase()}, ${product.id}, ${location.id}, 
             ${quantity}, ${quantity}, 'active', NOW()
