@@ -19,11 +19,11 @@ enum UserRole {
 
 // Order status flow
 enum OrderStatus {
-  RECEIVED      // Order from Shopify received
-  PREPARING     // Being prepared for delivery
+  RECEIVED
+  PREPARING
   OUT_FOR_DELIVERY
   DELIVERED
-  FAILED        // Delivery attempt failed
+  FAILED
 }
 
 // Shopify sync status
@@ -38,12 +38,11 @@ model User {
   email         String    @unique
   name          String?
   role          UserRole  @default(OPERATOR)
-  password      String    // Hashed
+  password      String
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   isActive      Boolean   @default(true)
   
-  // Relations
   assignedDeliveries Delivery[]
   activityLogs       ActivityLog[]
   
@@ -65,7 +64,6 @@ model Customer {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
-  // Relations
   orders Order[]
   
   @@map("customers")
@@ -76,35 +74,27 @@ model Order {
   shopifyId         String            @unique
   shopifyOrderNumber String?
   
-  // Customer info
   customerId        String
   customer          Customer          @relation(fields: [customerId], references: [id])
   
-  // Order details
   totalAmount       Decimal           @db.Decimal(10, 2)
   currency          String            @default("USD")
-  lineItems         Json              // Array of { title, quantity, price, sku }
+  lineItems         Json
   
-  // Status
   status            OrderStatus       @default(RECEIVED)
   shopifySyncStatus ShopifySyncStatus @default(PENDING)
   
-  // Shopify sync timestamps
   shopifyUpdatedAt  DateTime?
   
-  // HubSpot sync
   hubspotSynced     Boolean           @default(false)
   hubspotSyncAt     DateTime?
   
-  // Relations
   delivery          Delivery?
   activityLogs      ActivityLog[]
   
-  // Timestamps
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   
-  // Indexes for performance at scale
   @@index([customerId])
   @@index([status])
   @@index([createdAt])
@@ -119,36 +109,29 @@ model Delivery {
   orderId         String    @unique
   order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
   
-  // Assignment
   assignedToId    String?
   assignedTo      User?     @relation(fields: [assignedToId], references: [id])
   assignedAt      DateTime?
   
-  // Delivery details
   deliveryAddress String
   deliveryNotes   String?
   
-  // Proof of delivery
-  signatureUrl    String?   // Cloudinary URL
-  photoUrl        String?   // Cloudinary URL
+  signatureUrl    String?
+  photoUrl        String?
   deliveredAt     DateTime?
   
-  // Geolocation
   latitude        Float?
   longitude       Float?
   
-  // Delivery attempt
   deliveryNotesInternal String?
   failedReason    String?
   
-  // HubSpot sync
   hubspotSynced   Boolean   @default(false)
   hubspotSyncAt   DateTime?
   
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   
-  // Indexes for performance at scale
   @@index([orderId])
   @@index([assignedToId])
   @@index([deliveredAt])
@@ -164,18 +147,16 @@ model ActivityLog {
   
   actorId     String?
   actor       User?    @relation(fields: [actorId], references: [id])
-  actorEmail  String?  // Denormalized for audit trail integrity
+  actorEmail  String?
   
-  action      String   // ENUM: status_changed, assigned, delivered, note_added, etc.
+  action      String
   
-  // Lean change tracking (no JSON blob)
-  entityType  String   // "order", "delivery", "inventory"
-  fieldName   String?  // "status", "assignedToId", etc.
-  oldValue    String?  // Previous value (stringified)
-  newValue    String?  // New value (stringified)
-  notes       String?  // Human-readable context
+  entityType  String
+  fieldName   String?
+  oldValue    String?
+  newValue    String?
+  notes       String?
   
-  // Audit metadata
   ipAddress   String?
   userAgent   String?
   
@@ -187,12 +168,11 @@ model ActivityLog {
   @@map("activity_logs")
 }
 
-// Webhook events from Shopify for processing
 model WebhookEvent {
   id          String   @id @default(cuid())
-  shopifyId   String   // Unique webhook ID from Shopify
-  topic       String   // e.g., "orders/create", "orders/updated"
-  payload     Json     // Full webhook payload
+  shopifyId   String
+  topic       String
+  payload     Json
   processed   Boolean  @default(false)
   processedAt DateTime?
   error       String?
@@ -204,81 +184,191 @@ model WebhookEvent {
   @@map("webhook_events")
 }
 
-// Inventory tracking for Demand Planner Agent
-model Inventory {
+// ============================================
+// KRAK INVENTORY SYSTEM (NEW)
+// ============================================
+
+model Product {
+  id              String   @id @default(cuid())
+  sku             String   @unique
+  name            String
+  description     String?
+  
+  category        String   @default("beverage")
+  subcategory     String?
+  brand           String   @default("krak")
+  
+  unitWeight      Decimal? @db.Decimal(10, 2)
+  unitVolume      Int?
+  
+  basePrice       Decimal  @db.Decimal(10, 2)
+  costPrice       Decimal? @db.Decimal(10, 2)
+  currency        String   @default("USD")
+  
+  isBundle        Boolean  @default(false)
+  
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  inventoryItems  Inventory[]
+  bundleComponents BundleComponent[] @relation("BundleParent")
+  componentOf     BundleComponent[] @relation("BundleChild")
+  batches         Batch[]
+  
+  @@map("products")
+}
+
+model BundleComponent {
   id            String   @id @default(cuid())
-  sku           String   @unique
+  parentSku     String
+  parent        Product  @relation("BundleParent", fields: [parentSku], references: [sku])
+  childSku      String
+  child         Product  @relation("BundleChild", fields: [childSku], references: [sku])
+  quantity      Int
   
-  // Product info
-  name          String
-  category      String?  // UDT, 3DH, OHL, etc.
-  productLine   String?  // Lipstick, Lip Oil, Blush, etc.
-  variant       String?  // Shade/color code
-  size          String?  // REG, MIN, SET, etc.
-  
-  // Stock levels (aggregated across all batches)
-  currentStock  Int      @default(0)
-  reserved      Int      @default(0)
-  available     Int      @default(0)
-  
-  // Reorder logic
-  reorderPoint  Int?
-  reorderQty    Int?
-  leadTimeDays  Int?     // Days from order to delivery
-  
-  // Agent tracking
-  lastAgentAction String?
-  agentConfidence Float?
-  
-  // Relations
-  batches       InventoryBatch[]
+  version       String   @default("v1")
+  effectiveFrom DateTime @default(now())
+  effectiveTo   DateTime?
+  isActive      Boolean  @default(true)
   
   createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
   
-  @@index([sku])
-  @@index([category])
-  @@index([available])
+  @@unique([parentSku, childSku, version])
+  @@map("bundle_components")
+}
+
+model Location {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  type        String   @default("warehouse")
+  address     String?
+  isActive    Boolean  @default(true)
+  
+  inventory   Inventory[]
+  batches     Batch[]
+  
+  @@map("locations")
+}
+
+model Inventory {
+  id              String   @id @default(cuid())
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id])
+  locationId      String?
+  location        Location? @relation(fields: [locationId], references: [id])
+  
+  currentStock    Int      @default(0)
+  reserved        Int      @default(0)
+  available       Int      @default(0)
+  
+  reorderPoint    Int?
+  reorderQty      Int?
+  reorderLeadTime Int      @default(7)
+  
+  lastCountedAt   DateTime?
+  lastMovementAt  DateTime?
+  
+  movements       InventoryMovement[]
+  
+  @@unique([productId, locationId])
   @@map("inventory")
 }
 
-// Batch tracking for traceability and recalls
-model InventoryBatch {
+model InventoryMovement {
   id            String   @id @default(cuid())
-  
-  // Relations
   inventoryId   String
-  inventory     Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  inventory     Inventory @relation(fields: [inventoryId], references: [id])
   
-  // Batch identification
-  batchNumber   String   // Manufacturer batch code
-  internalCode  String?  // Your internal tracking code
-  
-  // Batch details
+  type          String   // 'in', 'out', 'adjustment', 'transfer', 'conversion'
   quantity      Int
-  quantityUsed  Int      @default(0)
-  quantityAvailable Int  @default(0)
+  reason        String?  // 'sale', 'receipt', 'damage', 'count', 'bundle_break', 'bundle_create'
   
-  // Dates
-  manufacturedAt DateTime?
-  receivedAt    DateTime @default(now())
-  expiresAt     DateTime? // For products with shelf life
+  orderId       String?
+  batchId       String?
   
-  // Quality/Recall
-  status        String   @default("ACTIVE") // ACTIVE, QUARANTINE, RECALLED, EXPIRED
-  qualityNotes  String?
-  recallReason  String?
+  sourceSku     String?
+  targetSku     String?
+  conversionRatio Int?
   
-  // Traceability
-  supplier      String?
-  poNumber      String?  // Purchase order reference
-  
+  performedBy   String?
+  notes         String?
   createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
   
-  @@index([inventoryId])
-  @@index([batchNumber])
-  @@index([status])
-  @@index([expiresAt])
-  @@map("inventory_batches")
+  @@map("inventory_movements")
+}
+
+model Batch {
+  id            String   @id @default(cuid())
+  batchCode     String   @unique
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id])
+  locationId    String?
+  location      Location? @relation(fields: [locationId], references: [id])
+  
+  manufacturedAt DateTime?
+  expiryDate     DateTime?
+  
+  initialQty     Int
+  remainingQty   Int
+  
+  status         String   @default("active")
+  
+  createdAt      DateTime @default(now())
+  
+  @@map("batches")
+}
+
+model PurchaseOrder {
+  id              String   @id @default(cuid())
+  poNumber        String   @unique
+  supplier        String?
+  status          String   @default("draft")
+  
+  totalItems      Int      @default(0)
+  totalQty        Int      @default(0)
+  totalValue      Decimal? @db.Decimal(12, 2)
+  
+  expectedDelivery DateTime?
+  receivedAt      DateTime?
+  
+  notes           String?
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  items           PurchaseOrderItem[]
+  
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id            String   @id @default(cuid())
+  poId          String
+  po            PurchaseOrder @relation(fields: [poId], references: [id])
+  productId     String
+  
+  orderedQty    Int
+  receivedQty   Int      @default(0)
+  unitCost      Decimal? @db.Decimal(10, 2)
+  
+  @@unique([poId, productId])
+  @@map("purchase_order_items")
+}
+
+model DemandForecast {
+  id                  String   @id @default(cuid())
+  productId           String
+  
+  avgDailySales       Decimal? @db.Decimal(10, 2)
+  daysUntilStockout   Int?
+  suggestedReorderQty Int?
+  confidence          Decimal? @db.Decimal(3, 2)
+  
+  calculatedAt        DateTime @default(now())
+  validUntil          DateTime?
+  
+  @@unique([productId, calculatedAt])
+  @@map("demand_forecasts")
 }
