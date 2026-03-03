@@ -1,461 +1,266 @@
-'use client';
+import { prisma } from '@/lib/prisma'
+import { requireAuth } from '@/lib/auth-helpers'
+import Link from 'next/link'
+import { ORDER_STATUS_FLOW, OrderStatusKey } from '@/lib/constants'
+import { formatCurrency, formatDate } from '@/lib/utils'
+import { OrderSearch } from './components/OrderSearch'
+import { OrderFilters } from './components/OrderFilters'
 
-import React, { useRef, useState, useCallback } from 'react';
-import SignatureCanvas from 'react-signature-canvas';
-import { useRouter } from 'next/navigation';
-
-interface AssignedTo {
-  name: string | null;
-  email: string;
-}
-
-interface Delivery {
-  id: string;
-  deliveryAddress: string;
-  deliveryNotes: string | null;
-  assignedTo: AssignedTo | null;
-  signatureUrl: string | null;
-  photoUrl: string | null;
-  deliveredAt: string | null;
-  latitude: number | null;
-  longitude: number | null;
-}
-
-interface Actor {
-  name: string | null;
-  email: string;
-}
-
-interface ActivityLog {
-  id: string;
-  action: string;
-  entityType: string;
-  fieldName: string | null;
-  oldValue: string | null;
-  newValue: string | null;
-  notes: string | null;
-  createdAt: string;
-  actor: Actor | null;
-}
-
-interface LineItem {
-  title: string;
-  quantity: number;
-  price: string;
-  sku: string | null;
-}
-
-interface Customer {
-  firstName: string | null;
-  lastName: string | null;
-  email: string;
-  phone: string | null;
-  address: string | null;
-  city: string | null;
-  postalCode: string | null;
-  country: string | null;
-}
-
-interface Order {
-  id: string;
-  shopifyId: string;
-  shopifyOrderNumber: string | null;
-  status: string;
-  totalAmount: number;
-  currency: string;
-  lineItems: LineItem[];
-  createdAt: string;
-  updatedAt: string;
-  customer: Customer | null;
-  delivery: Delivery | null;
-  activityLogs: ActivityLog[];
-}
-
-interface User {
-  id: string;
-  name: string | null;
-  email: string;
-}
-
-interface OrderDetailClientProps {
-  order: Order;
-  users: User[];
-}
-
-export default function OrderDetailClient({ order, users }: OrderDetailClientProps) {
-  const router = useRouter();
-  const signatureRef = useRef<SignatureCanvas>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+export default async function DashboardPage({ 
+  searchParams 
+}: { 
+  searchParams: Promise<{ 
+    search?: string
+    status?: string
+    dateFrom?: string
+    dateTo?: string
+    country?: string
+  }> 
+}) {
+  await requireAuth()
   
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [deliveryNotes, setDeliveryNotes] = useState(order.delivery?.deliveryNotes || '');
-  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(order.delivery?.photoUrl || null);
-  const [signatureData, setSignatureData] = useState<string | null>(order.delivery?.signatureUrl || null);
-  const [activeTab, setActiveTab] = useState<'details' | 'delivery'>('details');
-
-  const clearSignature = useCallback(() => {
-    signatureRef.current?.clear();
-    setSignatureData(null);
-  }, []);
-
-  const saveSignature = useCallback(() => {
-    if (signatureRef.current && !signatureRef.current.isEmpty()) {
-      const dataUrl = signatureRef.current.toDataURL('image/png');
-      setSignatureData(dataUrl);
-    }
-  }, []);
-
-  const handlePhotoCapture = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setCapturedPhoto(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  }, []);
-
-  const triggerCamera = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
-
-  const handleAssignDelivery = useCallback(async (userId: string) => {
-    try {
-      const response = await fetch(`/api/orders/${order.id}/delivery/assign`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
-      });
-      
-      if (!response.ok) throw new Error('Failed to assign delivery');
-      router.refresh();
-    } catch (error) {
-      console.error('Error assigning delivery:', error);
-    }
-  }, [order.id, router]);
-
-  const handleCompleteDelivery = useCallback(async () => {
-    if (!signatureData && !capturedPhoto) {
-      alert('Please provide a signature or photo to complete delivery');
-      return;
-    }
-
-    setIsSubmitting(true);
-    
-    try {
-      const response = await fetch(`/api/orders/${order.id}/delivery/complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          signatureUrl: signatureData,
-          photoUrl: capturedPhoto,
-          notes: deliveryNotes,
-        }),
-      });
-      
-      if (!response.ok) throw new Error('Failed to complete delivery');
-      router.refresh();
-    } catch (error) {
-      console.error('Error completing delivery:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [order.id, signatureData, capturedPhoto, deliveryNotes, router]);
-
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      RECEIVED: 'bg-[#1A3A2F] text-[#22C55E] border border-[#22C55E]/30',
-      PREPARING: 'bg-[#1A2A3A] text-[#3B82F6] border border-[#3B82F6]/30',
-      OUT_FOR_DELIVERY: 'bg-[#3A2A1A] text-[#F59E0B] border border-[#F59E0B]/30',
-      DELIVERED: 'bg-[#1A3A2F] text-[#22C55E] border border-[#22C55E]/30',
-      FAILED: 'bg-[#3A1A1A] text-[#EF4444] border border-[#EF4444]/30',
-    };
-    return colors[status] || 'bg-[#2A2A2A] text-gray-300 border border-[#3A3A3A]';
-  };
-
-  const customerName = order.customer 
-    ? `${order.customer.firstName || ''} ${order.customer.lastName || ''}`.trim() || 'Unknown'
-    : 'Unknown';
-
+  const params = await searchParams
+  const { search, status, dateFrom, dateTo, country } = params
+  
+  const where: any = {}
+  
+  if (status && status !== 'ALL') where.status = status
+  
+  if (dateFrom || dateTo) {
+    where.createdAt = {}
+    if (dateFrom) where.createdAt.gte = new Date(dateFrom)
+    if (dateTo) where.createdAt.lte = new Date(dateTo)
+  }
+  
+  if (search) {
+    where.OR = [
+      { shopifyOrderNumber: { contains: search, mode: 'insensitive' } },
+      { customer: { OR: [
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+      ]}}
+    ]
+  }
+  
+  if (country && country !== 'ALL') where.customer = { country }
+  
+  const orders = await prisma.order.findMany({
+    where,
+    include: {
+      customer: { select: { firstName: true, lastName: true, email: true, phone: true, country: true } },
+      delivery: { include: { assignedTo: { select: { name: true } } } },
+      _count: { select: { activityLogs: true } }
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+  })
+  
+  const today = new Date(); today.setHours(0,0,0,0)
+  const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7)
+  
+  const [totalOrders, todayOrders, weekOrders, pendingOrders] = await Promise.all([
+    prisma.order.count(),
+    prisma.order.count({ where: { createdAt: { gte: today } } }),
+    prisma.order.count({ where: { createdAt: { gte: weekAgo } } }),
+    prisma.order.count({ where: { status: { in: ['RECEIVED', 'PREPARING', 'OUT_FOR_DELIVERY'] } } }),
+  ])
+  
+  const stats = {
+    total: orders.length,
+    received: orders.filter(o => o.status === 'RECEIVED').length,
+    preparing: orders.filter(o => o.status === 'PREPARING').length,
+    outForDelivery: orders.filter(o => o.status === 'OUT_FOR_DELIVERY').length,
+    delivered: orders.filter(o => o.status === 'DELIVERED').length,
+    failed: orders.filter(o => o.status === 'FAILED').length,
+  }
+  
   return (
-    <div className="min-h-screen bg-[#0A0A0A] pb-20">
+    <div className="min-h-screen bg-[#0A0A0A] pb-20 md:pb-8">
       {/* Header */}
-      <div className="bg-[#141414] border-b border-[#2A2A2A] px-4 py-4 sticky top-0 z-10">
-        <div className="flex items-center justify-between">
+      <div className="bg-[#141414] border-b border-[#2A2A2A] px-4 md:px-6 py-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-lg sm:text-2xl font-bold text-white">
-              Order {order.shopifyOrderNumber || order.shopifyId.slice(0, 8)}
-            </h1>
-            <p className="text-gray-400 text-sm">
-              {new Date(order.createdAt).toLocaleDateString()}
-            </p>
+            <h1 className="text-xl md:text-2xl font-bold text-white">Orders</h1>
+            <p className="text-gray-400 text-sm md:text-base">Track Shopify orders</p>
           </div>
-          <span className={`px-3 py-1 rounded-lg text-xs font-medium ${getStatusColor(order.status)}`}>
-            {order.status.replace(/_/g, ' ')}
-          </span>
+          <Link
+            href="/dashboard/inventory"
+            className="bg-[#FF6B4A] hover:bg-[#FF8566] text-white px-3 md:px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            Inventory
+          </Link>
         </div>
       </div>
 
-      {/* Mobile Tab Navigation */}
-      <div className="flex border-b border-[#2A2A2A] bg-[#141414]">
-        <button
-          onClick={() => setActiveTab('details')}
-          className={`flex-1 py-3 text-sm font-medium ${
-            activeTab === 'details'
-              ? 'text-[#FF6B4A] border-b-2 border-[#FF6B4A]'
-              : 'text-gray-400'
-          }`}
-        >
-          Details
-        </button>
-        <button
-          onClick={() => setActiveTab('delivery')}
-          className={`flex-1 py-3 text-sm font-medium ${
-            activeTab === 'delivery'
-              ? 'text-[#FF6B4A] border-b-2 border-[#FF6B4A]'
-              : 'text-gray-400'
-          }`}
-        >
-          Delivery
-        </button>
-      </div>
+      <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
+        {/* Stats - Mobile: 3 columns, Tablet+: 6 columns */}
+        <div className="grid grid-cols-3 md:grid-cols-6 gap-2 md:gap-4">
+          <div className="bg-[#141414] p-3 md:p-4 rounded-lg md:rounded-xl border border-[#2A2A2A] text-center md:text-left">
+            <p className="text-xs text-gray-400">Today</p>
+            <p className="text-xl md:text-2xl font-bold text-white">{todayOrders}</p>
+          </div>
+          
+          <div className="bg-[#141414] p-3 md:p-4 rounded-lg md:rounded-xl border border-[#2A2A2A] text-center md:text-left">
+            <p className="text-xs text-gray-400">Pending</p>
+            <p className="text-xl md:text-2xl font-bold text-[#F59E0B]">{pendingOrders}</p>
+          </div>
+          
+          <div className="bg-[#141414] p-3 md:p-4 rounded-lg md:rounded-xl border border-[#2A2A2A] text-center md:text-left">
+            <p className="text-xs text-gray-400">Total</p>
+            <p className="text-xl md:text-2xl font-bold text-white">{totalOrders}</p>
+          </div>
+          
+          <div className="hidden md:block bg-[#141414] p-4 rounded-xl border border-[#2A2A2A]">
+            <p className="text-sm text-gray-400">Received</p>
+            <p className="text-2xl font-bold text-[#3B82F6]">{stats.received}</p>
+          </div>
+          
+          <div className="hidden md:block bg-[#141414] p-4 rounded-xl border border-[#2A2A2A]">
+            <p className="text-sm text-gray-400">Preparing</p>
+            <p className="text-2xl font-bold text-[#EAB308]">{stats.preparing}</p>
+          </div>
+          
+          <div className="hidden md:block bg-[#141414] p-4 rounded-xl border border-[#2A2A2A]">
+            <p className="text-sm text-gray-400">Delivered</p>
+            <p className="text-2xl font-bold text-[#22C55E]">{stats.delivered}</p>
+          </div>
+        </div>
 
-      <div className="p-4 space-y-4">
-        {/* Details Tab */}
-        {activeTab === 'details' && (
-          <>
-            {/* Customer Info */}
-            <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-4">
-              <h2 className="text-base font-semibold text-white mb-3">Customer</h2>
-              <div className="space-y-2 text-sm">
-                <p className="text-white font-medium">{customerName}</p>
-                <p className="text-gray-400">{order.customer?.email}</p>
-                {order.customer?.phone && (
-                  <p className="text-gray-400">{order.customer.phone}</p>
-                )}
-                <p className="text-gray-500 text-xs mt-2">
-                  {order.customer?.address}
-                  {order.customer?.city && `, ${order.customer.city}`}
-                  {order.customer?.postalCode && ` ${order.customer.postalCode}`}
-                  {order.customer?.country && `, ${order.customer.country}`}
-                </p>
-              </div>
-            </div>
+        {/* Mobile Status Scroll */}
+        <div className="flex md:hidden gap-2 overflow-x-auto pb-2 -mx-4 px-4">
+          <div className="flex-shrink-0 bg-[#141414] px-4 py-2 rounded-lg border border-[#2A2A2A]">
+            <span className="text-xs text-gray-400">Recv: </span>
+            <span className="text-sm font-bold text-[#3B82F6]">{stats.received}</span>
+          </div>
+          <div className="flex-shrink-0 bg-[#141414] px-4 py-2 rounded-lg border border-[#2A2A2A]">
+            <span className="text-xs text-gray-400">Prep: </span>
+            <span className="text-sm font-bold text-[#EAB308]">{stats.preparing}</span>
+          </div>
+          <div className="flex-shrink-0 bg-[#141414] px-4 py-2 rounded-lg border border-[#2A2A2A]">
+            <span className="text-xs text-gray-400">Out: </span>
+            <span className="text-sm font-bold text-[#A855F7]">{stats.outForDelivery}</span>
+          </div>
+          <div className="flex-shrink-0 bg-[#141414] px-4 py-2 rounded-lg border border-[#2A2A2A]">
+            <span className="text-xs text-gray-400">Done: </span>
+            <span className="text-sm font-bold text-[#22C55E]">{stats.delivered}</span>
+          </div>
+          <div className="flex-shrink-0 bg-[#141414] px-4 py-2 rounded-lg border border-[#2A2A2A]">
+            <span className="text-xs text-gray-400">Fail: </span>
+            <span className="text-sm font-bold text-[#EF4444]">{stats.failed}</span>
+          </div>
+        </div>
 
-            {/* Order Items */}
-            <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-4">
-              <h2 className="text-base font-semibold text-white mb-3">Items</h2>
-              <div className="space-y-3">
-                {order.lineItems.map((item, index) => (
-                  <div key={index} className="flex justify-between items-start py-2 border-b border-[#2A2A2A] last:border-0">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white truncate">{item.title}</p>
-                      <p className="text-xs text-gray-400">Qty: {item.quantity} {item.sku && `• ${item.sku}`}</p>
+        {/* Search */}
+        <div className="bg-[#141414] p-3 md:p-4 rounded-xl border border-[#2A2A2A]">
+          <OrderSearch defaultValue={search} />
+        </div>
+
+        {/* Orders - Mobile: Cards, Tablet+: Table */}
+        
+        {/* Mobile Card View */}
+        <div className="md:hidden space-y-3">
+          {orders.map((order) => {
+            const statusConfig = ORDER_STATUS_FLOW[order.status as OrderStatusKey]
+            
+            return (
+              <Link
+                key={order.id}
+                href={`/dashboard/orders/${order.id}`}
+                className="block bg-[#141414] rounded-xl border border-[#2A2A2A] p-4 hover:border-[#3A3A3A] transition-colors"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-white font-medium">
+                        #{order.shopifyOrderNumber || order.id.slice(0, 8)}
+                      </span>
+                      <span className={`px-2 py-0.5 text-xs rounded-full ${statusConfig?.color || 'bg-gray-800 text-gray-300'}`}>
+                        {statusConfig?.label || order.status}
+                      </span>
                     </div>
-                    <p className="text-sm text-white ml-4">${parseFloat(item.price).toFixed(2)}</p>
-                  </div>
-                ))}
-                <div className="flex justify-between items-center pt-3">
-                  <p className="font-semibold text-white">Total</p>
-                  <p className="font-semibold text-white">${order.totalAmount.toFixed(2)}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Activity Log */}
-            <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-4">
-              <h2 className="text-base font-semibold text-white mb-3">Activity</h2>
-              <div className="space-y-3 max-h-64 overflow-y-auto">
-                {order.activityLogs.length === 0 ? (
-                  <p className="text-gray-400 text-sm">No activity yet.</p>
-                ) : (
-                  order.activityLogs.map((log) => (
-                    <div key={log.id} className="flex items-start space-x-2">
-                      <div className="w-1.5 h-1.5 mt-2 rounded-full bg-[#FF6B4A] flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-white">{log.action}</p>
-                        {log.notes && <p className="text-xs text-gray-500">{log.notes}</p>}
-                        <p className="text-xs text-gray-500 mt-1">
-                          {log.actor?.name || 'System'} • {new Date(log.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
+                    <p className="text-gray-300 text-sm truncate">
+                      {order.customer?.firstName} {order.customer?.lastName}
+                    </p>
+                    <p className="text-gray-500 text-xs truncate">{order.customer?.email}</p>
+                    
+                    <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
+                      <span>{formatCurrency(Number(order.totalAmount), order.currency)}</span>
+                      <span>•</span>
+                      <span>{formatDate(order.createdAt)}</span>
+                      {order._count.activityLogs > 0 && (
+                        <>
+                          <span>•</span>
+                          <span className="text-blue-400">{order._count.activityLogs} updates</span>
+                        </>
+                      )}
                     </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Delivery Tab */}
-        {activeTab === 'delivery' && (
-          <>
-            {/* Delivery Info */}
-            <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-4">
-              <h2 className="text-base font-semibold text-white mb-3">Delivery Info</h2>
-              
-              {order.delivery ? (
-                <div className="space-y-3 text-sm">
-                  <div>
-                    <p className="text-gray-500 text-xs">Address</p>
-                    <p className="text-gray-300">{order.delivery.deliveryAddress}</p>
                   </div>
                   
-                  {order.delivery.assignedTo && (
-                    <div>
-                      <p className="text-gray-500 text-xs">Assigned To</p>
-                      <p className="text-gray-300">
-                        {order.delivery.assignedTo.name || order.delivery.assignedTo.email}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Assign Driver */}
-                  <div className="pt-3 border-t border-[#2A2A2A]">
-                    <p className="text-sm font-medium text-white mb-2">Assign Driver</p>
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {users.map((user) => (
-                        <button
-                          key={user.id}
-                          onClick={() => handleAssignDelivery(user.id)}
-                          className={`w-full flex items-center space-x-3 p-3 rounded-lg border transition-colors ${
-                            order.delivery?.assignedTo?.email === user.email
-                              ? 'border-[#FF6B4A] bg-[#FF6B4A]/10'
-                              : 'border-[#2A2A2A] hover:border-[#3A3A3A]'
-                          }`}
-                        >
-                          <div className="w-8 h-8 rounded-full bg-[#2A2A2A] flex items-center justify-center text-sm font-medium text-white flex-shrink-0">
-                            {(user.name || user.email).charAt(0).toUpperCase()}
-                          </div>
-                          <div className="flex-1 text-left min-w-0">
-                            <p className="text-sm text-white truncate">{user.name || 'Unnamed'}</p>
-                            <p className="text-xs text-gray-400 truncate">{user.email}</p>
-                          </div>
-                          {order.delivery?.assignedTo?.email === user.email && (
-                            <span className="text-[#FF6B4A] text-xs font-medium flex-shrink-0">Assigned</span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  <svg className="w-5 h-5 text-gray-500 flex-shrink-0 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
                 </div>
-              ) : (
-                <p className="text-gray-400 text-sm">No delivery info available.</p>
-              )}
-            </div>
+              </Link>
+            )
+          })}
+        </div>
 
-            {/* Complete Delivery */}
-            {order.delivery && (
-              <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-4">
-                <h2 className="text-base font-semibold text-white mb-4">Complete Delivery</h2>
+        {/* Tablet/Desktop Table View */}
+        <div className="hidden md:block bg-[#141414] rounded-xl border border-[#2A2A2A] overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-[#1A1A1A]">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Order</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Customer</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Amount</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Assigned</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Date</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#2A2A2A]">
+              {orders.map((order) => {
+                const statusConfig = ORDER_STATUS_FLOW[order.status as OrderStatusKey]
                 
-                {/* Signature Pad - Full width on mobile */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Customer Signature
-                  </label>
-                  <div className="border-2 border-[#2A2A2A] rounded-lg overflow-hidden bg-white touch-none">
-                    <SignatureCanvas
-                      ref={signatureRef}
-                      canvasProps={{
-                        className: 'w-full h-40 touch-none',
-                        style: { touchAction: 'none' }
-                      }}
-                      backgroundColor="white"
-                    />
-                  </div>
-                  <div className="flex gap-2 mt-2">
-                    <button
-                      onClick={clearSignature}
-                      className="flex-1 px-3 py-2 text-sm text-gray-400 border border-[#2A2A2A] rounded-lg"
-                    >
-                      Clear
-                    </button>
-                    <button
-                      onClick={saveSignature}
-                      className="flex-1 px-3 py-2 text-sm text-[#FF6B4A] border border-[#FF6B4A]/30 rounded-lg"
-                    >
-                      Save
-                    </button>
-                  </div>
-                  {signatureData && (
-                    <p className="text-sm text-[#22C55E] mt-2">✓ Signature saved</p>
-                  )}
-                </div>
-
-                {/* Photo Capture */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Delivery Photo
-                  </label>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handlePhotoCapture}
-                    className="hidden"
-                  />
-                  <button
-                    onClick={triggerCamera}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-[#2A2A2A] rounded-lg"
-                  >
-                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span className="text-gray-400">Take Photo</span>
-                  </button>
-                  {capturedPhoto && (
-                    <div className="mt-3">
-                      <img
-                        src={capturedPhoto}
-                        alt="Delivery"
-                        className="w-full h-48 object-cover rounded-lg"
-                      />
-                      <button
-                        onClick={() => setCapturedPhoto(null)}
-                        className="text-sm text-[#EF4444] mt-2"
+                return (
+                  <tr key={order.id} className="hover:bg-[#1A1A1A]">
+                    <td className="px-6 py-4">
+                      <span className="text-white font-medium">#{order.shopifyOrderNumber || order.id.slice(0, 8)}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-white">{order.customer?.firstName} {order.customer?.lastName}</div>
+                      <div className="text-gray-400 text-sm">{order.customer?.email}</div>
+                    </td>
+                    <td className="px-6 py-4 text-white">{formatCurrency(Number(order.totalAmount), order.currency)}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 text-xs rounded-full ${statusConfig?.color || 'bg-gray-800 text-gray-300'}`}>
+                        {statusConfig?.label || order.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-white">{order.delivery?.assignedTo?.name || '—'}</td>
+                    <td className="px-6 py-4 text-gray-400">{formatDate(order.createdAt)}</td>
+                    <td className="px-6 py-4 text-right">
+                      <Link
+                        href={`/dashboard/orders/${order.id}`}
+                        className="text-[#FF6B4A] hover:text-[#FF8566] text-sm font-medium"
                       >
-                        Remove
-                      </button>
-                    </div>
-                  )}
-                </div>
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
 
-                {/* Notes */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Notes
-                  </label>
-                  <textarea
-                    value={deliveryNotes}
-                    onChange={(e) => setDeliveryNotes(e.target.value)}
-                    placeholder="Add notes..."
-                    rows={3}
-                    className="w-full px-3 py-2 bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg text-white text-sm"
-                  />
-                </div>
-
-                {/* Complete Button */}
-                <button
-                  onClick={handleCompleteDelivery}
-                  disabled={isSubmitting || (!signatureData && !capturedPhoto)}
-                  className={`w-full py-3 px-4 rounded-lg font-medium text-white ${
-                    isSubmitting || (!signatureData && !capturedPhoto)
-                      ? 'bg-gray-600'
-                      : 'bg-[#22C55E]'
-                  }`}
-                >
-                  {isSubmitting ? 'Completing...' : 'Mark Delivered'}
-                </button>
-              </div>
-            )}
-          </>
+        {orders.length === 0 && (
+          <div className="text-center py-12 text-gray-400">No orders found</div>
         )}
       </div>
     </div>
-  );
+  )
 }
 
