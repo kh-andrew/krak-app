@@ -21,7 +21,7 @@ export async function GET() {
         p.name,
         p."basePrice",
         p."isBundle"
-      FROM "Inventory" i
+      FROM "inventory" i
       JOIN "Product" p ON i."productId" = p.id
       ORDER BY i.available ASC
       LIMIT 100
@@ -30,7 +30,7 @@ export async function GET() {
     return NextResponse.json(inventory)
     
   } catch (error) {
-    console.error('Inventory fetch error:', error)
+    console.error('inventory fetch error:', error)
     return NextResponse.json(
       { error: 'Failed to load inventory' },
       { status: 500 }
