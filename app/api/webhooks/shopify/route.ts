@@ -70,7 +70,7 @@ async function processOrderCreate(payload: any) {
       country: shipping_address?.country || customer?.default_address?.country,
     },
     create: {
-      shopifyId: customer?.id,
+      shopifyId: customer?.id?.toString(),
       email: email || customer?.email || `order-${id}@placeholder.com`,
       firstName: customer?.first_name,
       lastName: customer?.last_name,
@@ -85,7 +85,7 @@ async function processOrderCreate(payload: any) {
   // Create order
   const order = await prisma.order.create({
     data: {
-      shopifyId: id,
+      shopifyId: id?.toString(),
       shopifyOrderNumber: name,
       customerId: customerData.id,
       totalAmount: parseFloat(total_price),
