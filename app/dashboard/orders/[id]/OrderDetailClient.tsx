@@ -88,6 +88,7 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
   const [deliveryNotes, setDeliveryNotes] = useState(order.delivery?.deliveryNotes || '');
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(order.delivery?.photoUrl || null);
   const [signatureData, setSignatureData] = useState<string | null>(order.delivery?.signatureUrl || null);
@@ -120,7 +121,12 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
     fileInputRef.current?.click();
   }, []);
 
+  const handleRefresh = () => {
+    router.refresh();
+  };
+
   const handleAssignDelivery = useCallback(async (userId: string) => {
+    setIsAssigning(true);
     try {
       const response = await fetch(`/api/orders/${order.id}/delivery/assign`, {
         method: 'PATCH',
@@ -132,6 +138,9 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
       router.refresh();
     } catch (error) {
       console.error('Error assigning delivery:', error);
+      alert('Failed to assign driver');
+    } finally {
+      setIsAssigning(false);
     }
   }, [order.id, router]);
 
@@ -144,28 +153,16 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
     setIsSubmitting(true);
     
     try {
-      // Convert base64 signature to blob
-      let signatureBlob: Blob | null = null;
-      if (signatureData) {
-        const base64Response = await fetch(signatureData);
-        signatureBlob = await base64Response.blob();
-      }
-
-      // Convert base64 photo to blob
-      let photoBlob: Blob | null = null;
-      if (capturedPhoto) {
-        const base64Response = await fetch(capturedPhoto);
-        photoBlob = await base64Response.blob();
-      }
-
-      // Create FormData
+      // Create FormData - send base64 directly (faster than blob conversion)
       const formData = new FormData();
       formData.append('action', 'complete');
-      if (signatureBlob) {
-        formData.append('signatureDataUrl', signatureData as string);
+      if (signatureData) {
+        formData.append('signatureDataUrl', signatureData);
       }
-      if (photoBlob) {
-        formData.append('photo', photoBlob, 'delivery-photo.jpg');
+      if (capturedPhoto) {
+        // Extract base64 data and send as string
+        const base64Data = capturedPhoto.split(',')[1];
+        formData.append('photoBase64', base64Data);
       }
       if (deliveryNotes) {
         formData.append('notes', deliveryNotes);
@@ -181,7 +178,8 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
         throw new Error(errorData.error || 'Failed to complete delivery');
       }
       
-      router.refresh();
+      // Redirect to orders page after successful delivery
+      router.push('/dashboard');
     } catch (error) {
       console.error('Error completing delivery:', error);
       alert(error instanceof Error ? error.message : 'Failed to complete delivery');
@@ -207,7 +205,7 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] pb-20">
-      {/* Header */}
+      {/* Header with Refresh */}
       <div className="bg-[#141414] border-b border-[#2A2A2A] px-4 py-4 sticky top-0 z-10">
         <div className="flex items-center justify-between">
           <div>
@@ -218,9 +216,20 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
               {new Date(order.createdAt).toLocaleDateString()}
             </p>
           </div>
-          <span className={`px-3 py-1 rounded-lg text-xs font-medium ${getStatusColor(order.status)}`}>
-            {order.status.replace(/_/g, ' ')}
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRefresh}
+              className="p-2 text-gray-400 hover:text-white hover:bg-[#2A2A2A] rounded-lg transition-colors"
+              title="Refresh"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            <span className={`px-3 py-1 rounded-lg text-xs font-medium ${getStatusColor(order.status)}`}>
+              {order.status.replace(/_/g, ' ')}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -330,40 +339,58 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
                   </div>
                   
                   {order.delivery.assignedTo && (
-                    <div>
-                      <p className="text-gray-500 text-xs">Assigned To</p>
-                      <p className="text-gray-300">
-                        {order.delivery.assignedTo.name || order.delivery.assignedTo.email}
-                      </p>
+                    <div className="bg-[#FF6B4A]/10 border border-[#FF6B4A]/30 rounded-lg p-3">
+                      <p className="text-gray-500 text-xs">Currently Assigned To</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="w-8 h-8 rounded-full bg-[#FF6B4A] flex items-center justify-center text-sm font-medium text-white">
+                          {(order.delivery.assignedTo.name || order.delivery.assignedTo.email).charAt(0).toUpperCase()}
+                        </div>
+                        <p className="text-white font-medium">
+                          {order.delivery.assignedTo.name || order.delivery.assignedTo.email}
+                        </p>
+                      </div>
                     </div>
                   )}
 
                   {/* Assign Driver */}
                   <div className="pt-3 border-t border-[#2A2A2A]">
-                    <p className="text-sm font-medium text-white mb-2">Assign Driver</p>
+                    <p className="text-sm font-medium text-white mb-2">{order.delivery.assignedTo ? 'Change Driver' : 'Assign Driver'}</p>
+                    {isAssigning && (
+                      <p className="text-xs text-gray-400 mb-2">Assigning...</p>
+                    )}
                     <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {users.map((user) => (
-                        <button
-                          key={user.id}
-                          onClick={() => handleAssignDelivery(user.id)}
-                          className={`w-full flex items-center space-x-3 p-3 rounded-lg border transition-colors ${
-                            order.delivery?.assignedTo?.email === user.email
-                              ? 'border-[#FF6B4A] bg-[#FF6B4A]/10'
-                              : 'border-[#2A2A2A] hover:border-[#3A3A3A]'
-                          }`}
-                        >
-                          <div className="w-8 h-8 rounded-full bg-[#2A2A2A] flex items-center justify-center text-sm font-medium text-white flex-shrink-0">
-                            {(user.name || user.email).charAt(0).toUpperCase()}
-                          </div>
-                          <div className="flex-1 text-left min-w-0">
-                            <p className="text-sm text-white truncate">{user.name || 'Unnamed'}</p>
-                            <p className="text-xs text-gray-400 truncate">{user.email}</p>
-                          </div>
-                          {order.delivery?.assignedTo?.email === user.email && (
-                            <span className="text-[#FF6B4A] text-xs font-medium flex-shrink-0">Assigned</span>
-                          )}
-                        </button>
-                      ))}
+                      {users.map((user) => {
+                        const isAssigned = order.delivery?.assignedTo?.email === user.email;
+                        return (
+                          <button
+                            key={user.id}
+                            onClick={() => !isAssigned && handleAssignDelivery(user.id)}
+                            disabled={isAssigned || isAssigning}
+                            className={`w-full flex items-center space-x-3 p-3 rounded-lg border-2 transition-all ${
+                              isAssigned
+                                ? 'border-[#FF6B4A] bg-[#FF6B4A]/20 cursor-default'
+                                : 'border-[#2A2A2A] hover:border-[#FF6B4A]/50 hover:bg-[#1A1A1A]'
+                            }`}
+                          >
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 ${
+                              isAssigned ? 'bg-[#FF6B4A] text-white' : 'bg-[#2A2A2A] text-gray-400'
+                            }`}>
+                              {(user.name || user.email).charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex-1 text-left min-w-0">
+                              <p className={`text-sm truncate ${isAssigned ? 'text-white font-medium' : 'text-gray-300'}`}>
+                                {user.name || 'Unnamed'}
+                              </p>
+                              <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                            </div>
+                            {isAssigned && (
+                              <span className="text-[#FF6B4A] text-xs font-bold flex-shrink-0 bg-[#FF6B4A]/20 px-2 py-1 rounded">
+                                ✓ ASSIGNED
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -373,14 +400,14 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
             </div>
 
             {/* Complete Delivery */}
-            {order.delivery && (
+            {order.delivery && order.status !== 'DELIVERED' && (
               <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-4">
                 <h2 className="text-base font-semibold text-white mb-4">Complete Delivery</h2>
                 
-                {/* Signature Pad - Full width on mobile */}
+                {/* Signature Pad */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Customer Signature
+                    Customer Signature {signatureData && <span className="text-[#22C55E]">✓</span>}
                   </label>
                   <div className="border-2 border-[#2A2A2A] rounded-lg overflow-hidden bg-white touch-none">
                     <SignatureCanvas
@@ -395,26 +422,23 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
                   <div className="flex gap-2 mt-2">
                     <button
                       onClick={clearSignature}
-                      className="flex-1 px-3 py-2 text-sm text-gray-400 border border-[#2A2A2A] rounded-lg"
+                      className="flex-1 px-3 py-2 text-sm text-gray-400 border border-[#2A2A2A] rounded-lg hover:bg-[#1A1A1A]"
                     >
                       Clear
                     </button>
                     <button
                       onClick={saveSignature}
-                      className="flex-1 px-3 py-2 text-sm text-[#FF6B4A] border border-[#FF6B4A]/30 rounded-lg"
+                      className="flex-1 px-3 py-2 text-sm text-[#FF6B4A] border border-[#FF6B4A]/30 rounded-lg hover:bg-[#FF6B4A]/10"
                     >
-                      Save
+                      Save Signature
                     </button>
                   </div>
-                  {signatureData && (
-                    <p className="text-sm text-[#22C55E] mt-2">✓ Signature saved</p>
-                  )}
                 </div>
 
                 {/* Photo Capture */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Delivery Photo
+                    Delivery Photo {capturedPhoto && <span className="text-[#22C55E]">✓</span>}
                   </label>
                   <input
                     ref={fileInputRef}
@@ -424,18 +448,19 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
                     onChange={handlePhotoCapture}
                     className="hidden"
                   />
-                  <button
-                    onClick={triggerCamera}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-[#2A2A2A] rounded-lg"
-                  >
-                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span className="text-gray-400">Take Photo</span>
-                  </button>
-                  {capturedPhoto && (
-                    <div className="mt-3">
+                  {!capturedPhoto ? (
+                    <button
+                      onClick={triggerCamera}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-[#2A2A2A] rounded-lg hover:border-[#3A3A3A] hover:bg-[#1A1A1A] transition-colors"
+                    >
+                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span className="text-gray-400">Take Photo</span>
+                    </button>
+                  ) : (
+                    <div className="relative">
                       <img
                         src={capturedPhoto}
                         alt="Delivery"
@@ -443,7 +468,7 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
                       />
                       <button
                         onClick={() => setCapturedPhoto(null)}
-                        className="text-sm text-[#EF4444] mt-2"
+                        className="absolute top-2 right-2 bg-red-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-red-600"
                       >
                         Remove
                       </button>
@@ -453,15 +478,13 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
 
                 {/* Notes */}
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Notes
-                  </label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Notes (Optional)</label>
                   <textarea
                     value={deliveryNotes}
                     onChange={(e) => setDeliveryNotes(e.target.value)}
-                    placeholder="Add notes..."
+                    placeholder="Add any delivery notes..."
                     rows={3}
-                    className="w-full px-3 py-2 bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg text-white text-sm"
+                    className="w-full px-3 py-2 bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg text-white text-sm focus:outline-none focus:border-[#FF6B4A]"
                   />
                 </div>
 
@@ -469,14 +492,34 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
                 <button
                   onClick={handleCompleteDelivery}
                   disabled={isSubmitting || (!signatureData && !capturedPhoto)}
-                  className={`w-full py-3 px-4 rounded-lg font-medium text-white ${
+                  className={`w-full py-4 px-4 rounded-lg font-bold text-lg text-white transition-all ${
                     isSubmitting || (!signatureData && !capturedPhoto)
-                      ? 'bg-gray-600'
-                      : 'bg-[#22C55E]'
+                      ? 'bg-gray-600 cursor-not-allowed'
+                      : 'bg-[#22C55E] hover:bg-[#16A34A] active:scale-95'
                   }`}
                 >
-                  {isSubmitting ? 'Completing...' : 'Mark Delivered'}
+                  {isSubmitting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Processing...
+                    </span>
+                  ) : (
+                    '✓ Mark as Delivered'
+                  )}
                 </button>
+                
+                <p className="text-xs text-gray-500 text-center mt-2">
+                  {signatureData && capturedPhoto 
+                    ? 'Signature + Photo ready'
+                    : signatureData 
+                      ? 'Signature ready (photo optional)'
+                      : capturedPhoto
+                        ? 'Photo ready (signature optional)'
+                        : 'Signature or photo required'}
+                </p>
               </div>
             )}
           </>
