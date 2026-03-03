@@ -3,48 +3,33 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-helpers'
 
 // GET /api/inventory
-// Returns inventory with product details using Prisma relations
+// Load inventory with product details
 export async function GET() {
   await requireAuth()
   
   try {
-    // Use Prisma's relation query to get inventory with product details
-    const inventory = await prisma.inventory.findMany({
-      include: {
-        product: {
-          select: {
-            sku: true,
-            name: true,
-            basePrice: true,
-            isBundle: true
-          }
-        }
-      },
-      orderBy: {
-        available: 'asc'
-      },
-      take: 100
-    })
+    const inventory = await prisma.$queryRaw`
+      SELECT 
+        i.id,
+        i."currentStock",
+        i.reserved,
+        i.available,
+        i."reorderPoint",
+        i."reorderQty",
+        p.sku,
+        p.name,
+        p."basePrice",
+        p."isBundle"
+      FROM "Inventory" i
+      JOIN "Product" p ON i."productId" = p.id
+      ORDER BY i.available ASC
+      LIMIT 100
+    `
     
-    // Transform to match expected format
-    const formatted = inventory.map(item => ({
-      id: item.id,
-      currentStock: item.currentStock,
-      reserved: item.reserved,
-      available: item.available,
-      reorderPoint: item.reorderPoint,
-      reorderQty: item.reorderQty,
-      sku: item.product?.sku || 'UNKNOWN',
-      name: item.product?.name || 'Unknown Product',
-      basePrice: item.product?.basePrice || 0,
-      isBundle: item.product?.isBundle || false
-    }))
-    
-    return NextResponse.json(formatted)
+    return NextResponse.json(inventory || [])
     
   } catch (error) {
-    console.error('inventory fetch error:', error)
-    // Return empty array on error
+    console.error('Inventory load error:', error)
     return NextResponse.json([])
   }
 }
