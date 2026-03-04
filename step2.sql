@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS "locations" ("id" TEXT PRIMARY KEY DEFAULT gen_random_uuid(), "code" TEXT UNIQUE NOT NULL, "name" TEXT NOT NULL, "type" TEXT DEFAULT 'warehouse');
+CREATE TABLE IF NOT EXISTS "inventory" ("id" TEXT PRIMARY KEY DEFAULT gen_random_uuid(), "productId" TEXT NOT NULL, "locationId" TEXT, "currentStock" INTEGER DEFAULT 0, "reserved" INTEGER DEFAULT 0, "available" INTEGER DEFAULT 0, "reorderPoint" INTEGER, "reorderQty" INTEGER, CONSTRAINT "inventory_productId_locationId_key" UNIQUE ("productId", "locationId"));
+CREATE TABLE IF NOT EXISTS "inventory_movements" ("id" TEXT PRIMARY KEY DEFAULT gen_random_uuid(), "inventoryId" TEXT NOT NULL, "type" TEXT NOT NULL, "quantity" INTEGER NOT NULL, "reason" TEXT, "notes" TEXT, "createdAt" TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS "batches" ("id" TEXT PRIMARY KEY DEFAULT gen_random_uuid(), "batchCode" TEXT UNIQUE NOT NULL, "productId" TEXT NOT NULL, "locationId" TEXT, "initialQty" INTEGER NOT NULL, "remainingQty" INTEGER NOT NULL, "status" TEXT DEFAULT 'active', "createdAt" TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX IF NOT EXISTS "inventory_productId_idx" ON "inventory"("productId");
+CREATE INDEX IF NOT EXISTS "inventory_locationId_idx" ON "inventory"("locationId");
