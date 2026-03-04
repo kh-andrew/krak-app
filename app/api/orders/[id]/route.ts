@@ -105,14 +105,14 @@ export async function PATCH(
   })
   
   // If delivered, sync to HubSpot
-  if (status === 'DELIVERED' && order.delivery) {
+  if (status === 'DELIVERED' && order.deliveries) {
     await prisma.deliveries.update({
-      where: { id: order.delivery.id },
+      where: { id: order.deliveries.id },
       data: { deliveredAt: new Date() },
     })
     
     // Async HubSpot sync (don't block response)
-    syncDeliveryToHubSpot(order.delivery.id).catch(console.error)
+    syncDeliveryToHubSpot(order.deliveries.id).catch(console.error)
   }
   
   return NextResponse.json(updatedOrder)
