@@ -61,11 +61,32 @@ async function seedInventory() {
   ]
   
   for (const item of sampleInventory) {
-    await prisma.inventory.upsert({
-      where: { sku: item.sku },
-      update: item,
-      create: item,
+    // Find product by SKU first
+    const product = await prisma.product.findUnique({
+      where: { sku: item.sku }
     })
+    
+    if (product) {
+      await prisma.inventory.upsert({
+        where: { 
+          id: item.id || `${item.sku}-default`
+        },
+        update: {
+          currentStock: item.currentStock,
+          available: item.available,
+          reserved: item.reserved,
+        },
+        create: {
+          id: item.id || `${item.sku}-default`,
+          productId: product.id,
+          currentStock: item.currentStock || 0,
+          available: item.available || 0,
+          reserved: item.reserved || 0,
+          reorderPoint: item.reorderPoint,
+          reorderQty: item.reorderQty,
+        },
+      })
+    }
   }
   
   console.log(`Seeded ${sampleInventory.length} inventory items`)
