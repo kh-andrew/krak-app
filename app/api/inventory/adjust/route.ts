@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     }
 
     // Find product
-    const product = await prisma.product.findUnique({
+    const product = await prisma.Product.findUnique({
       where: { sku }
     })
 
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     }
 
     // Find location
-    const location = await prisma.location.findUnique({
+    const location = await prisma.Location.findUnique({
       where: { code: locationCode }
     })
 
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     }
 
     // Get or create inventory
-    let inventory = await prisma.inventory.findUnique({
+    let inventory = await prisma.Inventory.findUnique({
       where: {
         productId_locationId: {
           productId: product.id,
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
 
     if (!inventory) {
       // Create inventory record if doesn't exist
-      inventory = await prisma.inventory.create({
+      inventory = await prisma.Inventory.create({
         data: {
           productId: product.id,
           locationId: location.id,
