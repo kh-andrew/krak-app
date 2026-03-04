@@ -18,18 +18,18 @@ export async function POST(req: Request) {
     const qty = parseInt(quantity)
     
     // Get or create location
-    let location = await prisma.Location.findFirst({ where: { code: 'WH-HK-01' } })
+    let location = await prisma.location.findFirst({ where: { code: 'WH-HK-01' } })
     if (!location) {
-      location = await prisma.Location.create({
+      location = await prisma.location.create({
         data: { code: 'WH-HK-01', name: 'Hong Kong Warehouse', type: 'warehouse' }
       })
     }
     
     // Get or create product
-    let product = await prisma.Product.findUnique({ where: { sku: skuUpper } })
+    let product = await prisma.product.findUnique({ where: { sku: skuUpper } })
     if (!product) {
       const isBundle = skuUpper === 'KFSB' || skuUpper === 'KFSP'
-      product = await prisma.Product.create({
+      product = await prisma.product.create({
         data: { 
           sku: skuUpper, 
           name: skuUpper,
@@ -41,12 +41,12 @@ export async function POST(req: Request) {
     }
     
     // Update or create inventory
-    let inventory = await prisma.Inventory.findFirst({
+    let inventory = await prisma.inventory.findFirst({
       where: { productId: product.id, locationId: location.id }
     })
     
     if (inventory) {
-      inventory = await prisma.Inventory.update({
+      inventory = await prisma.inventory.update({
         where: { id: inventory.id },
         data: {
           currentStock: { increment: qty },
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
         }
       })
     } else {
-      inventory = await prisma.Inventory.create({
+      inventory = await prisma.inventory.create({
         data: {
           productId: product.id,
           locationId: location.id,
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
     }
     
     // Log movement
-    await prisma.InventoryMovement.create({
+    await prisma.inventoryMovement.create({
       data: {
         inventoryId: inventory.id,
         type: 'in',
@@ -84,24 +84,24 @@ export async function POST(req: Request) {
     if (skuUpper === 'KFSB') {
       // Expand to KFSP
       const kfspQty = qty * 20
-      let kfsp = await prisma.Product.findUnique({ where: { sku: 'KFSP' } })
+      let kfsp = await prisma.product.findUnique({ where: { sku: 'KFSP' } })
       if (!kfsp) {
-        kfsp = await prisma.Product.create({
+        kfsp = await prisma.product.create({
           data: { sku: 'KFSP', name: 'KFSP', isBundle: true, basePrice: 0, costPrice: 0 }
         })
       }
       
-      let kfspInv = await prisma.Inventory.findFirst({
+      let kfspInv = await prisma.inventory.findFirst({
         where: { productId: kfsp.id, locationId: location.id }
       })
       
       if (kfspInv) {
-        await prisma.Inventory.update({
+        await prisma.inventory.update({
           where: { id: kfspInv.id },
           data: { currentStock: { increment: kfspQty }, available: { increment: kfspQty } }
         })
       } else {
-        kfspInv = await prisma.Inventory.create({
+        kfspInv = await prisma.inventory.create({
           data: {
             productId: kfsp.id,
             locationId: location.id,
@@ -115,24 +115,24 @@ export async function POST(req: Request) {
       
       // Expand KFSP to KFSS
       const kfssQty = kfspQty * 12
-      let kfss = await prisma.Product.findUnique({ where: { sku: 'KFSS' } })
+      let kfss = await prisma.product.findUnique({ where: { sku: 'KFSS' } })
       if (!kfss) {
-        kfss = await prisma.Product.create({
+        kfss = await prisma.product.create({
           data: { sku: 'KFSS', name: 'KFSS', isBundle: false, basePrice: 0, costPrice: 0 }
         })
       }
       
-      let kfssInv = await prisma.Inventory.findFirst({
+      let kfssInv = await prisma.inventory.findFirst({
         where: { productId: kfss.id, locationId: location.id }
       })
       
       if (kfssInv) {
-        await prisma.Inventory.update({
+        await prisma.inventory.update({
           where: { id: kfssInv.id },
           data: { currentStock: { increment: kfssQty }, available: { increment: kfssQty } }
         })
       } else {
-        await prisma.Inventory.create({
+        await prisma.inventory.create({
           data: {
             productId: kfss.id,
             locationId: location.id,
@@ -150,7 +150,7 @@ export async function POST(req: Request) {
     // Create batch if provided
     if (batchCode) {
       try {
-        await prisma.Batch.create({
+        await prisma.batch.create({
           data: {
             batchCode: batchCode.toUpperCase(),
             productId: product.id,

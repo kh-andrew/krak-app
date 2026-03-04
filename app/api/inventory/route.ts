@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 // GET /api/inventory
 export async function GET() {
   try {
-    const inventory = await prisma.Inventory.findMany({
+    const inventory = await prisma.inventory.findMany({
       take: 100,
       orderBy: { available: 'asc' },
       include: {
