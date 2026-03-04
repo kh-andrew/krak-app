@@ -20,17 +20,17 @@ export async function GET(
   const order = await prisma.orders.findUnique({
     where: { id },
     include: {
-      customer: true,
-      delivery: {
+      customers: true,
+      deliveries: {
         include: {
-          assignedTo: {
+          users: {
             select: { id: true, name: true, email: true },
           },
         },
       },
-      activityLogs: {
+      activity_logs: {
         include: {
-          actor: {
+          users: {
             select: { name: true, email: true },
           },
         },
