@@ -44,4 +44,4 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
-}
+}// Force rebuild Wed Mar  4 03:19:14 PM CST 2026
