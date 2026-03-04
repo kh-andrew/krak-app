@@ -89,9 +89,9 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
-  const [deliveryNotes, setDeliveryNotes] = useState(order.deliveries?.deliveryNotes || '');
-  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(order.deliveries?.photoUrl || null);
-  const [signatureData, setSignatureData] = useState<string | null>(order.deliveries?.signatureUrl || null);
+  const [deliveryNotes, setDeliveryNotes] = useState(order.delivery?.deliveryNotes || '');
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(order.delivery?.photoUrl || null);
+  const [signatureData, setSignatureData] = useState<string | null>(order.delivery?.signatureUrl || null);
   const [activeTab, setActiveTab] = useState<'details' | 'delivery'>('details');
 
   const clearSignature = useCallback(() => {
@@ -331,22 +331,22 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
             <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-4">
               <h2 className="text-base font-semibold text-white mb-3">Delivery Info</h2>
               
-              {order.deliveries ? (
+              {order.delivery ? (
                 <div className="space-y-3 text-sm">
                   <div>
                     <p className="text-gray-500 text-xs">Address</p>
-                    <p className="text-gray-300">{order.deliveries.deliveryAddress}</p>
+                    <p className="text-gray-300">{order.delivery.deliveryAddress}</p>
                   </div>
                   
-                  {order.deliveries.users && (
+                  {order.delivery.users && (
                     <div className="bg-[#FF6B4A]/10 border border-[#FF6B4A]/30 rounded-lg p-3">
                       <p className="text-gray-500 text-xs">Currently Assigned To</p>
                       <div className="flex items-center gap-2 mt-1">
                         <div className="w-8 h-8 rounded-full bg-[#FF6B4A] flex items-center justify-center text-sm font-medium text-white">
-                          {(order.deliveries.users.name || order.deliveries.users.email).charAt(0).toUpperCase()}
+                          {(order.delivery.assignedTo.name || order.delivery.assignedTo.email).charAt(0).toUpperCase()}
                         </div>
                         <p className="text-white font-medium">
-                          {order.deliveries.users.name || order.deliveries.users.email}
+                          {order.delivery.assignedTo.name || order.delivery.assignedTo.email}
                         </p>
                       </div>
                     </div>
@@ -354,13 +354,13 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
 
                   {/* Assign Driver */}
                   <div className="pt-3 border-t border-[#2A2A2A]">
-                    <p className="text-sm font-medium text-white mb-2">{order.deliveries.users ? 'Change Driver' : 'Assign Driver'}</p>
+                    <p className="text-sm font-medium text-white mb-2">{order.delivery.users ? 'Change Driver' : 'Assign Driver'}</p>
                     {isAssigning && (
                       <p className="text-xs text-gray-400 mb-2">Assigning...</p>
                     )}
                     <div className="space-y-2 max-h-48 overflow-y-auto">
                       {users.map((user) => {
-                        const isAssigned = order.deliveries?.users?.email === user.email;
+                        const isAssigned = order.delivery?.users?.email === user.email;
                         return (
                           <button
                             key={user.id}
@@ -400,7 +400,7 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
             </div>
 
             {/* Complete Delivery */}
-            {order.deliveries && order.status !== 'DELIVERED' && (
+            {order.delivery && order.status !== 'DELIVERED' && (
               <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-4">
                 <h2 className="text-base font-semibold text-white mb-4">Complete Delivery</h2>
                 
