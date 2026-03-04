@@ -77,9 +77,22 @@ export default async function InventoryPage() {
             <p className="text-xs text-gray-400">Low Stock</p>
             <p className="text-2xl font-bold text-[#EF4444]">{lowStockCount}</p>
           </div>
-          <div className="bg-[#141414] p-4 rounded-xl border border-[#2A2A2A] text-center">
-            <p className="text-xs text-gray-400">Total Units</p>
-            <p className="text-2xl font-bold text-white">{totalUnits.toLocaleString()}</p>
+          <div className="bg-[#141414] p-4 rounded-xl border border-[#2A2A2A]">
+            <p className="text-xs text-gray-400 text-center mb-2">Total Units</p>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Bottles</span>
+                <span className="font-semibold text-white">{bottles.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Packs</span>
+                <span className="font-semibold text-white">{packs.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Boxes</span>
+                <span className="font-semibold text-white">{boxes.toLocaleString()}</span>
+              </div>
+            </div>
           </div>
           <div className="bg-[#141414] p-4 rounded-xl border border-[#2A2A2A]">
             <p className="text-xs text-gray-400 text-center mb-2">Available</p>
