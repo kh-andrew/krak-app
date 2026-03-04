@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,14 +7,328 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// User roles for team access
+model User {
+  id                 String        @id @default(cuid())
+  email              String        @unique
+  name               String?
+  role               UserRole      @default(OPERATOR)
+  password           String
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  isActive           Boolean       @default(true)
+  activityLogs       ActivityLog[]
+  assignedDeliveries Delivery[]
+
+  @@map("users")
+}
+
+model Customer {
+  id         String   @id @default(cuid())
+  shopifyId  String?  @unique
+  email      String   @unique
+  firstName  String?
+  lastName   String?
+  phone      String?
+  address    String?
+  city       String?
+  postalCode String?
+  country    String?
+  hubspotId  String?  @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  orders     Order[]
+
+  @@map("customers")
+}
+
+model Order {
+  id                 String            @id @default(cuid())
+  shopifyId          String            @unique
+  shopifyOrderNumber String?
+  customerId         String
+  totalAmount        Decimal           @db.Decimal(10, 2)
+  currency           String            @default("USD")
+  lineItems          Json
+  status             OrderStatus       @default(RECEIVED)
+  shopifySyncStatus  ShopifySyncStatus @default(PENDING)
+  shopifyUpdatedAt   DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  hubspotSyncAt      DateTime?
+  hubspotSynced      Boolean           @default(false)
+  activityLogs       ActivityLog[]
+  delivery           Delivery?
+  customer           Customer          @relation(fields: [customerId], references: [id])
+
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([shopifyId])
+  @@index([hubspotSynced])
+  @@map("orders")
+}
+
+model Delivery {
+  id                    String    @id @default(cuid())
+  orderId               String    @unique
+  assignedToId          String?
+  assignedAt            DateTime?
+  deliveryAddress       String
+  deliveryNotes         String?
+  signatureUrl          String?
+  photoUrl              String?
+  deliveredAt           DateTime?
+  latitude              Float?
+  longitude             Float?
+  deliveryNotesInternal String?
+  failedReason          String?
+  hubspotSynced         Boolean   @default(false)
+  hubspotSyncAt         DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  assignedTo            User?     @relation(fields: [assignedToId], references: [id])
+  order                 Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([assignedToId])
+  @@index([deliveredAt])
+  @@index([hubspotSynced])
+  @@map("deliveries")
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  orderId    String
+  actorId    String?
+  action     String
+  details    Json?
+  createdAt  DateTime @default(now())
+  actorEmail String?
+  entityType String   @default("order")
+  fieldName  String?
+  oldValue   String?
+  newValue   String?
+  notes      String?
+  ipAddress  String?
+  userAgent  String?
+  actor      User?    @relation(fields: [actorId], references: [id])
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([entityType, createdAt])
+  @@index([createdAt])
+  @@index([orderId])
+  @@map("activity_logs")
+}
+
+model WebhookEvent {
+  id          String    @id @default(cuid())
+  shopifyId   String    @unique
+  topic       String
+  payload     Json
+  processed   Boolean   @default(false)
+  processedAt DateTime?
+  error       String?
+  createdAt   DateTime  @default(now())
+
+  @@index([processed])
+  @@map("webhook_events")
+}
+
+model Inventory {
+  id              String   @id @default(cuid())
+  sku             String   @unique
+  name            String
+  currentStock    Int      @default(0)
+  reserved        Int      @default(0)
+  available       Int      @default(0)
+  reorderPoint    Int?
+  reorderQty      Int?
+  lastAgentAction String?
+  agentConfidence Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+
+  @@index([available])
+  @@index([sku])
+  @@map("inventory")
+}
+
+model Batch {
+  id             String    @id @default(dbgenerated("gen_random_uuid()"))
+  batchCode      String    @unique
+  productId      String
+  locationId     String?
+  manufacturedAt DateTime? @db.Timestamp(6)
+  expiryDate     DateTime? @db.Timestamp(6)
+  initialQty     Int
+  remainingQty   Int
+  status         String?   @default("active")
+  createdAt      DateTime? @default(now()) @db.Timestamp(6)
+  Location       Location? @relation(fields: [locationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Product        Product   @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([productId], map: "idx_batch_product")
+}
+
+model BundleComponent {
+  id                                         String    @id @default(dbgenerated("gen_random_uuid()"))
+  parentSku                                  String
+  childSku                                   String
+  quantity                                   Int
+  version                                    String?   @default("v1")
+  effectiveFrom                              DateTime? @default(now()) @db.Timestamp(6)
+  effectiveTo                                DateTime? @db.Timestamp(6)
+  isActive                                   Boolean?  @default(true)
+  createdAt                                  DateTime? @default(now()) @db.Timestamp(6)
+  Product_BundleComponent_childSkuToProduct  Product   @relation("BundleComponent_childSkuToProduct", fields: [childSku], references: [sku], onDelete: NoAction, onUpdate: NoAction)
+  Product_BundleComponent_parentSkuToProduct Product   @relation("BundleComponent_parentSkuToProduct", fields: [parentSku], references: [sku], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([parentSku, childSku, version])
+  @@index([parentSku, isActive], map: "idx_bundle_parent")
+  @@index([parentSku, version], map: "idx_bundle_version")
+}
+
+model DemandForecast {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()"))
+  productId           String
+  avgDailySales       Decimal?  @db.Decimal(10, 2)
+  daysUntilStockout   Int?
+  suggestedReorderQty Int?
+  confidence          Decimal?  @db.Decimal(3, 2)
+  calculatedAt        DateTime? @default(now()) @db.Timestamp(6)
+  validUntil          DateTime? @db.Timestamp(6)
+  Product             Product   @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([productId, calculatedAt])
+}
+
+model public_Inventory {
+  id                String              @id @default(dbgenerated("gen_random_uuid()"))
+  productId         String
+  locationId        String?
+  currentStock      Int?                @default(0)
+  reserved          Int?                @default(0)
+  available         Int?                @default(0)
+  reorderPoint      Int?
+  reorderQty        Int?
+  reorderLeadTime   Int?                @default(7)
+  lastCountedAt     DateTime?           @db.Timestamp(6)
+  lastMovementAt    DateTime?           @db.Timestamp(6)
+  Location          Location?           @relation(fields: [locationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Product           Product             @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  InventoryMovement InventoryMovement[]
+
+  @@unique([productId, locationId])
+  @@index([locationId], map: "idx_inventory_location")
+  @@index([productId], map: "idx_inventory_product")
+  @@map("Inventory")
+}
+
+model InventoryMovement {
+  id              String           @id @default(dbgenerated("gen_random_uuid()"))
+  inventoryId     String
+  type            String
+  quantity        Int
+  reason          String?
+  orderId         String?
+  batchId         String?
+  sourceSku       String?
+  targetSku       String?
+  conversionRatio Int?
+  performedBy     String?
+  notes           String?
+  createdAt       DateTime?        @default(now()) @db.Timestamp(6)
+  Inventory       public_Inventory @relation(fields: [inventoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([createdAt], map: "idx_movement_created")
+  @@index([inventoryId], map: "idx_movement_inventory")
+}
+
+model Location {
+  id        String             @id @default(dbgenerated("gen_random_uuid()"))
+  code      String             @unique
+  name      String
+  type      String             @default("warehouse")
+  address   String?
+  isActive  Boolean?           @default(true)
+  Batch     Batch[]
+  Inventory public_Inventory[]
+}
+
+model Product {
+  id                                                 String              @id @default(dbgenerated("gen_random_uuid()"))
+  sku                                                String              @unique
+  name                                               String
+  description                                        String?
+  category                                           String              @default("beverage")
+  subcategory                                        String?
+  brand                                              String?             @default("krak")
+  unitWeight                                         Decimal?            @db.Decimal(10, 2)
+  unitVolume                                         Int?
+  basePrice                                          Decimal             @db.Decimal(10, 2)
+  costPrice                                          Decimal?            @db.Decimal(10, 2)
+  currency                                           String?             @default("USD")
+  isBundle                                           Boolean?            @default(false)
+  bundleComponents                                   Json?               @default("[]")
+  componentOf                                        Json?               @default("[]")
+  isActive                                           Boolean?            @default(true)
+  createdAt                                          DateTime?           @default(now()) @db.Timestamp(6)
+  updatedAt                                          DateTime?           @default(now()) @db.Timestamp(6)
+  Batch                                              Batch[]
+  BundleComponent_BundleComponent_childSkuToProduct  BundleComponent[]   @relation("BundleComponent_childSkuToProduct")
+  BundleComponent_BundleComponent_parentSkuToProduct BundleComponent[]   @relation("BundleComponent_parentSkuToProduct")
+  DemandForecast                                     DemandForecast[]
+  Inventory                                          public_Inventory[]
+  PurchaseOrderItem                                  PurchaseOrderItem[]
+
+  @@index([isActive], map: "idx_product_active")
+  @@index([sku], map: "idx_product_sku")
+}
+
+model PurchaseOrder {
+  id                String              @id @default(dbgenerated("gen_random_uuid()"))
+  poNumber          String              @unique
+  supplier          String?
+  status            String?             @default("draft")
+  totalItems        Int?                @default(0)
+  totalQty          Int?                @default(0)
+  totalValue        Decimal?            @db.Decimal(12, 2)
+  expectedDelivery  DateTime?           @db.Timestamp(6)
+  receivedAt        DateTime?           @db.Timestamp(6)
+  notes             String?
+  createdBy         String?
+  createdAt         DateTime?           @default(now()) @db.Timestamp(6)
+  updatedAt         DateTime?           @default(now()) @db.Timestamp(6)
+  PurchaseOrderItem PurchaseOrderItem[]
+
+  @@index([status], map: "idx_po_status")
+}
+
+model PurchaseOrderItem {
+  id            String        @id @default(dbgenerated("gen_random_uuid()"))
+  poId          String
+  productId     String
+  orderedQty    Int
+  receivedQty   Int?          @default(0)
+  unitCost      Decimal?      @db.Decimal(10, 2)
+  PurchaseOrder PurchaseOrder @relation(fields: [poId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Product       Product       @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([poId, productId])
+}
+
+model playing_with_neon {
+  id    Int    @id @default(autoincrement())
+  name  String
+  value Float? @db.Real
+}
+
 enum UserRole {
   ADMIN
   OPERATOR
   DRIVER
 }
 
-// Order status flow
 enum OrderStatus {
   RECEIVED
   PREPARING
@@ -26,349 +337,8 @@ enum OrderStatus {
   FAILED
 }
 
-// Shopify sync status
 enum ShopifySyncStatus {
   PENDING
   SYNCED
   FAILED
-}
-
-model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String?
-  role          UserRole  @default(OPERATOR)
-  password      String
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  isActive      Boolean   @default(true)
-  
-  assignedDeliveries Delivery[]
-  activityLogs       ActivityLog[]
-  
-  @@map("users")
-}
-
-model Customer {
-  id          String   @id @default(cuid())
-  shopifyId   String?  @unique
-  email       String   @unique
-  firstName   String?
-  lastName    String?
-  phone       String?
-  address     String?
-  city        String?
-  postalCode  String?
-  country     String?
-  hubspotId   String?  @unique
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  orders Order[]
-  
-  @@map("customers")
-}
-
-model Order {
-  id                String            @id @default(cuid())
-  shopifyId         String            @unique
-  shopifyOrderNumber String?
-  
-  customerId        String
-  customer          Customer          @relation(fields: [customerId], references: [id])
-  
-  totalAmount       Decimal           @db.Decimal(10, 2)
-  currency          String            @default("USD")
-  lineItems         Json
-  
-  status            OrderStatus       @default(RECEIVED)
-  shopifySyncStatus ShopifySyncStatus @default(PENDING)
-  
-  shopifyUpdatedAt  DateTime?
-  
-  hubspotSynced     Boolean           @default(false)
-  hubspotSyncAt     DateTime?
-  
-  delivery          Delivery?
-  activityLogs      ActivityLog[]
-  
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  
-  @@index([customerId])
-  @@index([status])
-  @@index([createdAt])
-  @@index([shopifyId])
-  @@index([hubspotSynced])
-  
-  @@map("orders")
-}
-
-model Delivery {
-  id              String    @id @default(cuid())
-  orderId         String    @unique
-  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  
-  assignedToId    String?
-  assignedTo      User?     @relation(fields: [assignedToId], references: [id])
-  assignedAt      DateTime?
-  
-  deliveryAddress String
-  deliveryNotes   String?
-  
-  signatureUrl    String?
-  photoUrl        String?
-  deliveredAt     DateTime?
-  
-  latitude        Float?
-  longitude       Float?
-  
-  deliveryNotesInternal String?
-  failedReason    String?
-  
-  hubspotSynced   Boolean   @default(false)
-  hubspotSyncAt   DateTime?
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
-  @@index([orderId])
-  @@index([assignedToId])
-  @@index([deliveredAt])
-  @@index([hubspotSynced])
-  
-  @@map("deliveries")
-}
-
-model ActivityLog {
-  id          String   @id @default(cuid())
-  orderId     String
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  
-  actorId     String?
-  actor       User?    @relation(fields: [actorId], references: [id])
-  actorEmail  String?
-  
-  action      String
-  
-  entityType  String
-  fieldName   String?
-  oldValue    String?
-  newValue    String?
-  notes       String?
-  
-  ipAddress   String?
-  userAgent   String?
-  
-  createdAt   DateTime @default(now())
-  
-  @@index([orderId, createdAt])
-  @@index([entityType, createdAt])
-  @@index([createdAt])
-  @@map("activity_logs")
-}
-
-model WebhookEvent {
-  id          String   @id @default(cuid())
-  shopifyId   String
-  topic       String
-  payload     Json
-  processed   Boolean  @default(false)
-  processedAt DateTime?
-  error       String?
-  
-  createdAt   DateTime @default(now())
-  
-  @@unique([shopifyId])
-  @@index([processed])
-  @@map("webhook_events")
-}
-
-// ============================================
-// KRAK INVENTORY SYSTEM (NEW)
-// ============================================
-
-model Product {
-  id              String   @id @default(cuid())
-  sku             String   @unique
-  name            String
-  description     String?
-  
-  category        String   @default("beverage")
-  subcategory     String?
-  brand           String   @default("krak")
-  
-  unitWeight      Decimal? @db.Decimal(10, 2)
-  unitVolume      Int?
-  
-  basePrice       Decimal  @db.Decimal(10, 2)
-  costPrice       Decimal? @db.Decimal(10, 2)
-  currency        String   @default("USD")
-  
-  isBundle        Boolean  @default(false)
-  
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  inventoryItems  Inventory[]
-  bundleComponents BundleComponent[] @relation("BundleParent")
-  componentOf     BundleComponent[] @relation("BundleChild")
-  batches         Batch[]
-  
-  @@map("products")
-}
-
-model BundleComponent {
-  id            String   @id @default(cuid())
-  parentSku     String
-  parent        Product  @relation("BundleParent", fields: [parentSku], references: [sku])
-  childSku      String
-  child         Product  @relation("BundleChild", fields: [childSku], references: [sku])
-  quantity      Int
-  
-  version       String   @default("v1")
-  effectiveFrom DateTime @default(now())
-  effectiveTo   DateTime?
-  isActive      Boolean  @default(true)
-  
-  createdAt     DateTime @default(now())
-  
-  @@unique([parentSku, childSku, version])
-  @@map("bundle_components")
-}
-
-model Location {
-  id          String   @id @default(cuid())
-  code        String   @unique
-  name        String
-  type        String   @default("warehouse")
-  address     String?
-  isActive    Boolean  @default(true)
-  
-  inventory   Inventory[]
-  batches     Batch[]
-  
-  @@map("locations")
-}
-
-model Inventory {
-  id              String   @id @default(cuid())
-  productId       String
-  product         Product  @relation(fields: [productId], references: [id])
-  locationId      String?
-  location        Location? @relation(fields: [locationId], references: [id])
-  
-  currentStock    Int      @default(0)
-  reserved        Int      @default(0)
-  available       Int      @default(0)
-  
-  reorderPoint    Int?
-  reorderQty      Int?
-  reorderLeadTime Int      @default(7)
-  
-  lastCountedAt   DateTime?
-  lastMovementAt  DateTime?
-  
-  movements       InventoryMovement[]
-  
-  @@unique([productId, locationId])
-  @@map("inventory")
-}
-
-model InventoryMovement {
-  id            String   @id @default(cuid())
-  inventoryId   String
-  inventory     Inventory @relation(fields: [inventoryId], references: [id])
-  
-  type          String   // 'in', 'out', 'adjustment', 'transfer', 'conversion'
-  quantity      Int
-  reason        String?  // 'sale', 'receipt', 'damage', 'count', 'bundle_break', 'bundle_create'
-  
-  orderId       String?
-  batchId       String?
-  
-  sourceSku     String?
-  targetSku     String?
-  conversionRatio Int?
-  
-  performedBy   String?
-  notes         String?
-  createdAt     DateTime @default(now())
-  
-  @@map("inventory_movements")
-}
-
-model Batch {
-  id            String   @id @default(cuid())
-  batchCode     String   @unique
-  productId     String
-  product       Product  @relation(fields: [productId], references: [id])
-  locationId    String?
-  location      Location? @relation(fields: [locationId], references: [id])
-  
-  manufacturedAt DateTime?
-  expiryDate     DateTime?
-  
-  initialQty     Int
-  remainingQty   Int
-  
-  status         String   @default("active")
-  
-  createdAt      DateTime @default(now())
-  
-  @@map("batches")
-}
-
-model PurchaseOrder {
-  id              String   @id @default(cuid())
-  poNumber        String   @unique
-  supplier        String?
-  status          String   @default("draft")
-  
-  totalItems      Int      @default(0)
-  totalQty        Int      @default(0)
-  totalValue      Decimal? @db.Decimal(12, 2)
-  
-  expectedDelivery DateTime?
-  receivedAt      DateTime?
-  
-  notes           String?
-  createdBy       String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  items           PurchaseOrderItem[]
-  
-  @@map("purchase_orders")
-}
-
-model PurchaseOrderItem {
-  id            String   @id @default(cuid())
-  poId          String
-  po            PurchaseOrder @relation(fields: [poId], references: [id])
-  productId     String
-  
-  orderedQty    Int
-  receivedQty   Int      @default(0)
-  unitCost      Decimal? @db.Decimal(10, 2)
-  
-  @@unique([poId, productId])
-  @@map("purchase_order_items")
-}
-
-model DemandForecast {
-  id                  String   @id @default(cuid())
-  productId           String
-  
-  avgDailySales       Decimal? @db.Decimal(10, 2)
-  daysUntilStockout   Int?
-  suggestedReorderQty Int?
-  confidence          Decimal? @db.Decimal(3, 2)
-  
-  calculatedAt        DateTime @default(now())
-  validUntil          DateTime?
-  
-  @@unique([productId, calculatedAt])
-  @@map("demand_forecasts")
 }
