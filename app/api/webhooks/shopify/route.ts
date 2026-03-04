@@ -82,6 +82,7 @@ async function processOrderCreate(payload: any) {
       city: shipping_address?.city,
       postalCode: shipping_address?.zip,
       country: shipping_address?.country,
+      updatedAt: new Date(),
     },
   })
 
@@ -102,6 +103,7 @@ async function processOrderCreate(payload: any) {
       })),
       status: 'RECEIVED',
       shopifySyncStatus: 'SYNCED',
+      updatedAt: new Date(),
     },
   })
 
