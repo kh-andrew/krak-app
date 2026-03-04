@@ -64,7 +64,7 @@ export async function PATCH(
   
   const order = await prisma.orders.findUnique({
     where: { id },
-    include: { delivery: true },
+    include: { deliveries: true },
   })
   
   if (!order) {

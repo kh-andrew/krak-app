@@ -13,22 +13,22 @@ export async function GET() {
         status: {
           in: ['RECEIVED', 'PREPARING', 'OUT_FOR_DELIVERY']
         },
-        delivery: {
+        deliveries: {
           isNot: null
         }
       },
       include: {
-        customer: {
+        customers: {
           select: {
             firstName: true,
             lastName: true,
             email: true
           }
         },
-        delivery: {
+        deliveries: {
           select: {
             deliveryAddress: true,
-            assignedTo: {
+            users: {
               select: {
                 email: true,
                 name: true
@@ -47,12 +47,12 @@ export async function GET() {
     const formatted = orders.map(order => ({
       id: order.id,
       shopifyOrderNumber: order.shopifyOrderNumber || order.id.slice(0, 8),
-      customerName: order.customer 
-        ? `${order.customer.firstName || ''} ${order.customer.lastName || ''}`.trim() || order.customer.email
+      customerName: order.customers 
+        ? `${order.customers.firstName || ''} ${order.customers.lastName || ''}`.trim() || order.customers.email
         : 'Unknown',
-      deliveryAddress: order.delivery?.deliveryAddress || 'No address',
+      deliveryAddress: order.deliveries?.deliveryAddress || 'No address',
       status: order.status,
-      assignedTo: order.delivery?.assignedTo?.email || null
+      assignedTo: order.deliveries?.users?.email || null
     }))
     
     return NextResponse.json(formatted)

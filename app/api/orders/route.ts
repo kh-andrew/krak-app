@@ -7,10 +7,10 @@ export async function GET() {
   
   const orders = await prisma.orders.findMany({
     include: {
-      customer: true,
-      delivery: {
+      customers: true,
+      deliveries: {
         include: {
-          assignedTo: {
+          users: {
             select: { id: true, name: true, email: true },
           },
         },
