@@ -32,8 +32,9 @@ export async function POST(req: Request) {
 
   // Store webhook event for processing
   try {
-    await prisma.webhookEvent.create({
+    await prisma.webhook_events.create({
       data: {
+        id: crypto.randomUUID(),
         shopifyId: shopifyWebhookId,
         topic,
         payload,
@@ -71,6 +72,7 @@ async function processOrderCreate(payload: any) {
       country: shipping_address?.country || customer?.default_address?.country,
     },
     create: {
+      id: crypto.randomUUID(),
       shopifyId: customer?.id?.toString(),
       email: email || customer?.email || `order-${id}@placeholder.com`,
       firstName: customer?.first_name,
@@ -86,6 +88,7 @@ async function processOrderCreate(payload: any) {
   // Create order
   const order = await prisma.orders.create({
     data: {
+      id: crypto.randomUUID(),
       shopifyId: id?.toString(),
       shopifyOrderNumber: name,
       customerId: customerData.id,
@@ -105,6 +108,7 @@ async function processOrderCreate(payload: any) {
   // Create delivery record
   await prisma.deliveries.create({
     data: {
+      id: crypto.randomUUID(),
       orderId: order.id,
       deliveryAddress: [
         shipping_address?.address1,
