@@ -199,8 +199,8 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
     return colors[status] || 'bg-[#2A2A2A] text-gray-300 border border-[#3A3A3A]';
   };
 
-  const customerName = order.customers 
-    ? `${order.customers.firstName || ''} ${order.customers.lastName || ''}`.trim() || 'Unknown'
+  const customerName = order.customer 
+    ? `${order.customer.firstName || ''} ${order.customer.lastName || ''}`.trim() || 'Unknown'
     : 'Unknown';
 
   return (
@@ -266,15 +266,15 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
               <h2 className="text-base font-semibold text-white mb-3">Customer</h2>
               <div className="space-y-2 text-sm">
                 <p className="text-white font-medium">{customerName}</p>
-                <p className="text-gray-400">{order.customers?.email}</p>
-                {order.customers?.phone && (
-                  <p className="text-gray-400">{order.customers.phone}</p>
+                <p className="text-gray-400">{order.customer?.email}</p>
+                {order.customer?.phone && (
+                  <p className="text-gray-400">{order.customer.phone}</p>
                 )}
                 <p className="text-gray-500 text-xs mt-2">
-                  {order.customers?.address}
-                  {order.customers?.city && `, ${order.customers.city}`}
-                  {order.customers?.postalCode && ` ${order.customers.postalCode}`}
-                  {order.customers?.country && `, ${order.customers.country}`}
+                  {order.customer?.address}
+                  {order.customer?.city && `, ${order.customer.city}`}
+                  {order.customer?.postalCode && ` ${order.customer.postalCode}`}
+                  {order.customer?.country && `, ${order.customer.country}`}
                 </p>
               </div>
             </div>
@@ -303,17 +303,17 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
             <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-4">
               <h2 className="text-base font-semibold text-white mb-3">Activity</h2>
               <div className="space-y-3 max-h-64 overflow-y-auto">
-                {order.activity_logs.length === 0 ? (
+                {order.activityLogs.length === 0 ? (
                   <p className="text-gray-400 text-sm">No activity yet.</p>
                 ) : (
-                  order.activity_logs.map((log) => (
+                  order.activityLogs.map((log) => (
                     <div key={log.id} className="flex items-start space-x-2">
                       <div className="w-1.5 h-1.5 mt-2 rounded-full bg-[#FF6B4A] flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-white">{log.action}</p>
                         {log.notes && <p className="text-xs text-gray-500">{log.notes}</p>}
                         <p className="text-xs text-gray-500 mt-1">
-                          {log.users?.name || 'System'} • {new Date(log.createdAt).toLocaleDateString()}
+                          {log.actor?.name || 'System'} • {new Date(log.createdAt).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
