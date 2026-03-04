@@ -57,6 +57,7 @@ export async function POST(
     // Log activity
     await prisma.activity_logs.create({
       data: {
+        id: crypto.randomUUID(),
         orderId: id,
         actorId: session.user.id,
         actorEmail: session.user.email,
@@ -147,6 +148,7 @@ export async function POST(
     // Log activity
     await prisma.activity_logs.create({
       data: {
+        id: crypto.randomUUID(),
         orderId: id,
         actorId: session.user.id,
         actorEmail: session.user.email,
