@@ -91,6 +91,7 @@ export async function PATCH(
   // Log activity (lean schema)
   await prisma.activity_logs.create({
     data: {
+      id: crypto.randomUUID(),
       orderId: id,
       actorId: session.user.id,
       actorEmail: session.user.email,

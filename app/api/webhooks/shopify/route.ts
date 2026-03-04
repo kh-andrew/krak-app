@@ -120,6 +120,7 @@ async function processOrderCreate(payload: any) {
   // Log activity (lean schema)
   await prisma.activity_logs.create({
     data: {
+      id: crypto.randomUUID(),
       orderId: order.id,
       action: 'order_received',
       entityType: 'order',
