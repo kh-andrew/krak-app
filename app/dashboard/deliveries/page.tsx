@@ -6,16 +6,16 @@ import { formatDate } from '@/lib/utils'
 export default async function DeliveriesPage() {
   await requireAuth()
   
-  const deliveries = await prisma.delivery.findMany({
+  const deliveries = await prisma.deliveries.findMany({
     include: {
-      order: {
+      orders: {
         include: {
-          customer: {
+          customers: {
             select: { firstName: true, lastName: true, email: true, phone: true },
           },
         },
       },
-      assignedTo: {
+      users: {
         select: { name: true, email: true },
       },
     },

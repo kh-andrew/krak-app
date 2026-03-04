@@ -11,20 +11,20 @@ export default async function OrderDetailPage({
   await requireAuth()
   const { id } = await params
   
-  const order = await prisma.order.findUnique({
+  const order = await prisma.orders.findUnique({
     where: { id },
     include: {
-      customer: true,
-      delivery: {
+      customers: true,
+      deliveries: {
         include: {
-          assignedTo: {
+          users: {
             select: { name: true, email: true },
           },
         },
       },
-      activityLogs: {
+      activity_logs: {
         include: {
-          actor: {
+          users: {
             select: { name: true, email: true },
           },
         },
@@ -37,7 +37,7 @@ export default async function OrderDetailPage({
     notFound()
   }
   
-  const users = await prisma.user.findMany({
+  const users = await prisma.users.findMany({
     where: { isActive: true },
     select: { id: true, name: true, email: true },
   })

@@ -45,12 +45,12 @@ export default async function DashboardPage({
   
   if (country && country !== 'ALL') where.customer = { country }
   
-  const orders = await prisma.order.findMany({
+  const orders = await prisma.orders.findMany({
     where,
     include: {
-      customer: { select: { firstName: true, lastName: true, email: true, phone: true, country: true } },
-      delivery: { include: { assignedTo: { select: { name: true } } } },
-      _count: { select: { activityLogs: true } }
+      customers: { select: { firstName: true, lastName: true, email: true, phone: true, country: true } },
+      deliveries: { include: { users: { select: { name: true } } } },
+      _count: { select: { activity_logs: true } }
     },
     orderBy: { createdAt: 'desc' },
     take: 100,
@@ -60,10 +60,10 @@ export default async function DashboardPage({
   const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7)
   
   const [totalOrders, todayOrders, weekOrders, pendingOrders] = await Promise.all([
-    prisma.order.count(),
-    prisma.order.count({ where: { createdAt: { gte: today } } }),
-    prisma.order.count({ where: { createdAt: { gte: weekAgo } } }),
-    prisma.order.count({ where: { status: { in: ['RECEIVED', 'PREPARING', 'OUT_FOR_DELIVERY'] } } }),
+    prisma.orders.count(),
+    prisma.orders.count({ where: { createdAt: { gte: today } } }),
+    prisma.orders.count({ where: { createdAt: { gte: weekAgo } } }),
+    prisma.orders.count({ where: { status: { in: ['RECEIVED', 'PREPARING', 'OUT_FOR_DELIVERY'] } } }),
   ])
   
   const stats = {
