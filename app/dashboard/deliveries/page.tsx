@@ -94,9 +94,9 @@ export default async function DeliveriesPage() {
                   
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-white">
-                      {delivery.orders.customer?.firstName} {delivery.orders.customer?.lastName}
+                      {delivery.orders.customers?.firstName} {delivery.orders.customers?.lastName}
                     </div>
-                    <div className="text-sm text-gray-400">{delivery.orders.customer?.email}</div>
+                    <div className="text-sm text-gray-400">{delivery.orders.customers?.email}</div>
                   </td>
                   
                   <td className="px-6 py-4">

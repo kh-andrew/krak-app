@@ -77,7 +77,7 @@ export default async function OrderDetailPage({
       latitude: order.deliveries.latitude,
       longitude: order.deliveries.longitude,
     } : null,
-    activityLogs: order.activity_logss.map(log => ({
+    activityLogs: order.activity_logs.map(log => ({
       id: log.id,
       action: log.action,
       entityType: log.entityType,
@@ -86,9 +86,9 @@ export default async function OrderDetailPage({
       newValue: log.newValue,
       notes: log.notes,
       createdAt: log.createdAt.toISOString(),
-      actor: log.actor ? {
-        name: log.actor.name,
-        email: log.actor.email,
+      actor: log.users ? {
+        name: log.users.name,
+        email: log.users.email,
       } : null,
     })),
   }
