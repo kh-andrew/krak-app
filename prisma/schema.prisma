@@ -256,9 +256,12 @@ model inventory {
 }
 
 model locations {
-  id   String @id @default(dbgenerated("gen_random_uuid()"))
-  code String @unique
-  name String
+  id       String   @id @default(dbgenerated("gen_random_uuid()"))
+  code     String   @unique
+  name     String
+  type     String?  @default("warehouse")
+  isactive Boolean? @default(true)
+  address  String?
 }
 
 model orders {
