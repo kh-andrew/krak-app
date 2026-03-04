@@ -188,10 +188,10 @@ export default async function DashboardPage({
                       <span>{formatCurrency(Number(order.totalAmount), order.currency)}</span>
                       <span>•</span>
                       <span>{formatDate(order.createdAt)}</span>
-                      {order._count.activityLogs > 0 && (
+                      {order._count.activity_logs > 0 && (
                         <>
                           <span>•</span>
-                          <span className="text-blue-400">{order._count.activityLogs} updates</span>
+                          <span className="text-blue-400">{order._count.activity_logs} updates</span>
                         </>
                       )}
                     </div>
@@ -239,7 +239,7 @@ export default async function DashboardPage({
                         {statusConfig?.label || order.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-white">{order.deliveries?.assignedTo?.name || '—'}</td>
+                    <td className="px-6 py-4 text-white">{order.deliveries?.users?.name || '—'}</td>
                     <td className="px-6 py-4 text-gray-400">{formatDate(order.createdAt)}</td>
                     <td className="px-6 py-4 text-right">
                       <Link

@@ -122,7 +122,7 @@ async function handlePending(chatId: number) {
     orders.slice(0, 10).forEach((order: any, i: number) => {
       message += `${i + 1}. *${order.shopifyOrderNumber || order.id.slice(0, 8)}*\n`
       message += `   ${order.customer?.firstName || ''} ${order.customer?.lastName || ''}\n`
-      message += `   ${order.delivery?.deliveryAddress?.slice(0, 30) || 'No address'}...\n\n`
+      message += `   ${order.deliveries?.deliveryAddress?.slice(0, 30) || 'No address'}...\n\n`
     })
     
     if (orders.length > 10) {

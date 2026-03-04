@@ -303,17 +303,17 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
             <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-4">
               <h2 className="text-base font-semibold text-white mb-3">Activity</h2>
               <div className="space-y-3 max-h-64 overflow-y-auto">
-                {order.activity_logss.length === 0 ? (
+                {order.activity_logs.length === 0 ? (
                   <p className="text-gray-400 text-sm">No activity yet.</p>
                 ) : (
-                  order.activity_logss.map((log) => (
+                  order.activity_logs.map((log) => (
                     <div key={log.id} className="flex items-start space-x-2">
                       <div className="w-1.5 h-1.5 mt-2 rounded-full bg-[#FF6B4A] flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-white">{log.action}</p>
                         {log.notes && <p className="text-xs text-gray-500">{log.notes}</p>}
                         <p className="text-xs text-gray-500 mt-1">
-                          {log.actor?.name || 'System'} • {new Date(log.createdAt).toLocaleDateString()}
+                          {log.users?.name || 'System'} • {new Date(log.createdAt).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
@@ -360,7 +360,7 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
                     )}
                     <div className="space-y-2 max-h-48 overflow-y-auto">
                       {users.map((user) => {
-                        const isAssigned = order.deliveries?.assignedTo?.email === user.email;
+                        const isAssigned = order.deliveries?.users?.email === user.email;
                         return (
                           <button
                             key={user.id}
