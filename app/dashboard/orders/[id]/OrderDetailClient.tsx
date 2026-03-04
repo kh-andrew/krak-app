@@ -338,7 +338,7 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
                     <p className="text-gray-300">{order.delivery.deliveryAddress}</p>
                   </div>
                   
-                  {order.delivery.users && (
+                  {order.delivery.assignedTo && (
                     <div className="bg-[#FF6B4A]/10 border border-[#FF6B4A]/30 rounded-lg p-3">
                       <p className="text-gray-500 text-xs">Currently Assigned To</p>
                       <div className="flex items-center gap-2 mt-1">
@@ -354,7 +354,7 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
 
                   {/* Assign Driver */}
                   <div className="pt-3 border-t border-[#2A2A2A]">
-                    <p className="text-sm font-medium text-white mb-2">{order.delivery.users ? 'Change Driver' : 'Assign Driver'}</p>
+                    <p className="text-sm font-medium text-white mb-2">{order.delivery.assignedTo ? 'Change Driver' : 'Assign Driver'}</p>
                     {isAssigning && (
                       <p className="text-xs text-gray-400 mb-2">Assigning...</p>
                     )}
