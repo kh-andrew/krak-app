@@ -360,7 +360,7 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
                     )}
                     <div className="space-y-2 max-h-48 overflow-y-auto">
                       {users.map((user) => {
-                        const isAssigned = order.delivery?.users?.email === user.email;
+                        const isAssigned = order.delivery?.assignedTo?.email === user.email;
                         return (
                           <button
                             key={user.id}
