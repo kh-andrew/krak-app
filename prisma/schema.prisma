@@ -7,152 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id                 String        @id @default(cuid())
-  email              String        @unique
-  name               String?
-  role               UserRole      @default(OPERATOR)
-  password           String
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
-  isActive           Boolean       @default(true)
-  activityLogs       ActivityLog[]
-  assignedDeliveries Delivery[]
-
-  @@map("users")
-}
-
-model Customer {
-  id         String   @id @default(cuid())
-  shopifyId  String?  @unique
-  email      String   @unique
-  firstName  String?
-  lastName   String?
-  phone      String?
-  address    String?
-  city       String?
-  postalCode String?
-  country    String?
-  hubspotId  String?  @unique
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  orders     Order[]
-
-  @@map("customers")
-}
-
-model Order {
-  id                 String            @id @default(cuid())
-  shopifyId          String            @unique
-  shopifyOrderNumber String?
-  customerId         String
-  totalAmount        Decimal           @db.Decimal(10, 2)
-  currency           String            @default("USD")
-  lineItems          Json
-  status             OrderStatus       @default(RECEIVED)
-  shopifySyncStatus  ShopifySyncStatus @default(PENDING)
-  shopifyUpdatedAt   DateTime?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
-  hubspotSyncAt      DateTime?
-  hubspotSynced      Boolean           @default(false)
-  activityLogs       ActivityLog[]
-  delivery           Delivery?
-  customer           Customer          @relation(fields: [customerId], references: [id])
-
-  @@index([customerId])
-  @@index([status])
-  @@index([createdAt])
-  @@index([shopifyId])
-  @@index([hubspotSynced])
-  @@map("orders")
-}
-
-model Delivery {
-  id                    String    @id @default(cuid())
-  orderId               String    @unique
-  assignedToId          String?
-  assignedAt            DateTime?
-  deliveryAddress       String
-  deliveryNotes         String?
-  signatureUrl          String?
-  photoUrl              String?
-  deliveredAt           DateTime?
-  latitude              Float?
-  longitude             Float?
-  deliveryNotesInternal String?
-  failedReason          String?
-  hubspotSynced         Boolean   @default(false)
-  hubspotSyncAt         DateTime?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-  assignedTo            User?     @relation(fields: [assignedToId], references: [id])
-  order                 Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  @@index([orderId])
-  @@index([assignedToId])
-  @@index([deliveredAt])
-  @@index([hubspotSynced])
-  @@map("deliveries")
-}
-
-model ActivityLog {
-  id         String   @id @default(cuid())
-  orderId    String
-  actorId    String?
-  action     String
-  details    Json?
-  createdAt  DateTime @default(now())
-  actorEmail String?
-  entityType String   @default("order")
-  fieldName  String?
-  oldValue   String?
-  newValue   String?
-  notes      String?
-  ipAddress  String?
-  userAgent  String?
-  actor      User?    @relation(fields: [actorId], references: [id])
-  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  @@index([entityType, createdAt])
-  @@index([createdAt])
-  @@index([orderId])
-  @@map("activity_logs")
-}
-
-model WebhookEvent {
-  id          String    @id @default(cuid())
-  shopifyId   String    @unique
-  topic       String
-  payload     Json
-  processed   Boolean   @default(false)
-  processedAt DateTime?
-  error       String?
-  createdAt   DateTime  @default(now())
-
-  @@index([processed])
-  @@map("webhook_events")
-}
-
-model Inventory {
-  id              String   @id @default(cuid())
-  sku             String   @unique
-  name            String
-  currentStock    Int      @default(0)
-  reserved        Int      @default(0)
-  available       Int      @default(0)
-  reorderPoint    Int?
-  reorderQty      Int?
-  lastAgentAction String?
-  agentConfidence Float?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime
-
-  @@index([available])
-  @@index([sku])
-  @@map("inventory")
-}
-
 model Batch {
   id             String    @id @default(dbgenerated("gen_random_uuid()"))
   batchCode      String    @unique
@@ -202,7 +56,7 @@ model DemandForecast {
   @@unique([productId, calculatedAt])
 }
 
-model public_Inventory {
+model Inventory {
   id                String              @id @default(dbgenerated("gen_random_uuid()"))
   productId         String
   locationId        String?
@@ -221,11 +75,10 @@ model public_Inventory {
   @@unique([productId, locationId])
   @@index([locationId], map: "idx_inventory_location")
   @@index([productId], map: "idx_inventory_product")
-  @@map("Inventory")
 }
 
 model InventoryMovement {
-  id              String           @id @default(dbgenerated("gen_random_uuid()"))
+  id              String    @id @default(dbgenerated("gen_random_uuid()"))
   inventoryId     String
   type            String
   quantity        Int
@@ -237,22 +90,22 @@ model InventoryMovement {
   conversionRatio Int?
   performedBy     String?
   notes           String?
-  createdAt       DateTime?        @default(now()) @db.Timestamp(6)
-  Inventory       public_Inventory @relation(fields: [inventoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdAt       DateTime? @default(now()) @db.Timestamp(6)
+  Inventory       Inventory @relation(fields: [inventoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([createdAt], map: "idx_movement_created")
   @@index([inventoryId], map: "idx_movement_inventory")
 }
 
 model Location {
-  id        String             @id @default(dbgenerated("gen_random_uuid()"))
-  code      String             @unique
+  id        String      @id @default(dbgenerated("gen_random_uuid()"))
+  code      String      @unique
   name      String
-  type      String             @default("warehouse")
+  type      String      @default("warehouse")
   address   String?
-  isActive  Boolean?           @default(true)
+  isActive  Boolean?    @default(true)
   Batch     Batch[]
-  Inventory public_Inventory[]
+  Inventory Inventory[]
 }
 
 model Product {
@@ -278,7 +131,7 @@ model Product {
   BundleComponent_BundleComponent_childSkuToProduct  BundleComponent[]   @relation("BundleComponent_childSkuToProduct")
   BundleComponent_BundleComponent_parentSkuToProduct BundleComponent[]   @relation("BundleComponent_parentSkuToProduct")
   DemandForecast                                     DemandForecast[]
-  Inventory                                          public_Inventory[]
+  Inventory                                          Inventory[]
   PurchaseOrderItem                                  PurchaseOrderItem[]
 
   @@index([isActive], map: "idx_product_active")
@@ -317,16 +170,127 @@ model PurchaseOrderItem {
   @@unique([poId, productId])
 }
 
-model playing_with_neon {
-  id    Int    @id @default(autoincrement())
-  name  String
-  value Float? @db.Real
+model activity_logs {
+  id         String   @id
+  orderId    String
+  actorId    String?
+  action     String
+  details    Json?
+  createdAt  DateTime @default(now())
+  actorEmail String?
+  entityType String   @default("order")
+  fieldName  String?
+  oldValue   String?
+  newValue   String?
+  notes      String?
+  ipAddress  String?
+  userAgent  String?
+  users      users?   @relation(fields: [actorId], references: [id])
+  orders     orders   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([entityType, createdAt])
+  @@index([orderId])
+}
+
+model customers {
+  id         String   @id
+  shopifyId  String?  @unique
+  email      String   @unique
+  firstName  String?
+  lastName   String?
+  phone      String?
+  address    String?
+  city       String?
+  postalCode String?
+  country    String?
+  hubspotId  String?  @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime
+  orders     orders[]
+}
+
+model deliveries {
+  id                    String    @id
+  orderId               String    @unique
+  assignedToId          String?
+  assignedAt            DateTime?
+  deliveryAddress       String
+  deliveryNotes         String?
+  signatureUrl          String?
+  photoUrl              String?
+  deliveredAt           DateTime?
+  latitude              Float?
+  longitude             Float?
+  deliveryNotesInternal String?
+  failedReason          String?
+  hubspotSynced         Boolean   @default(false)
+  hubspotSyncAt         DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime
+  users                 users?    @relation(fields: [assignedToId], references: [id])
+  orders                orders    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([assignedToId])
+  @@index([deliveredAt])
+  @@index([hubspotSynced])
+  @@index([orderId])
+}
+
+model inventory {
+  id              String   @id
+  sku             String   @unique
+  name            String
+  currentStock    Int      @default(0)
+  reserved        Int      @default(0)
+  available       Int      @default(0)
+  reorderPoint    Int?
+  reorderQty      Int?
+  lastAgentAction String?
+  agentConfidence Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+
+  @@index([available])
+  @@index([sku])
 }
 
 model locations {
   id   String @id @default(dbgenerated("gen_random_uuid()"))
   code String @unique
   name String
+}
+
+model orders {
+  id                 String            @id
+  shopifyId          String            @unique
+  shopifyOrderNumber String?
+  customerId         String
+  totalAmount        Decimal           @db.Decimal(10, 2)
+  currency           String            @default("USD")
+  lineItems          Json
+  status             OrderStatus       @default(RECEIVED)
+  shopifySyncStatus  ShopifySyncStatus @default(PENDING)
+  shopifyUpdatedAt   DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime
+  hubspotSyncAt      DateTime?
+  hubspotSynced      Boolean           @default(false)
+  activity_logs      activity_logs[]
+  deliveries         deliveries?
+  customers          customers         @relation(fields: [customerId], references: [id])
+
+  @@index([createdAt])
+  @@index([customerId])
+  @@index([hubspotSynced])
+  @@index([shopifyId])
+  @@index([status])
+}
+
+model playing_with_neon {
+  id    Int    @id @default(autoincrement())
+  name  String
+  value Float? @db.Real
 }
 
 model products {
@@ -340,10 +304,30 @@ model test_table {
   id String @id
 }
 
-enum UserRole {
-  ADMIN
-  OPERATOR
-  DRIVER
+model users {
+  id            String          @id
+  email         String          @unique
+  name          String?
+  role          UserRole        @default(OPERATOR)
+  password      String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime
+  isActive      Boolean         @default(true)
+  activity_logs activity_logs[]
+  deliveries    deliveries[]
+}
+
+model webhook_events {
+  id          String    @id
+  shopifyId   String    @unique
+  topic       String
+  payload     Json
+  processed   Boolean   @default(false)
+  processedAt DateTime?
+  error       String?
+  createdAt   DateTime  @default(now())
+
+  @@index([processed])
 }
 
 enum OrderStatus {
@@ -358,4 +342,10 @@ enum ShopifySyncStatus {
   PENDING
   SYNCED
   FAILED
+}
+
+enum UserRole {
+  ADMIN
+  OPERATOR
+  DRIVER
 }
