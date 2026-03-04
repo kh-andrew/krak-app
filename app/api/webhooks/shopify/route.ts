@@ -120,6 +120,7 @@ async function processOrderCreate(payload: any) {
         shipping_address?.zip,
         shipping_address?.country,
       ].filter(Boolean).join(', '),
+      updatedAt: new Date(),
     },
   })
 
