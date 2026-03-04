@@ -1,5 +1,5 @@
 // Shopify OAuth callback handler
-// Add to: app/api/shopify/auth/callback/route.ts
+// Updated for krakenergy.com domain
 
 import { NextRequest, NextResponse } from 'next/server'
 

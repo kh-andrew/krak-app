@@ -15,9 +15,9 @@ export async function POST(
   const formData = await req.formData()
   const action = formData.get('action') as string
   
-  const delivery = await prisma.delivery.findUnique({
+  const delivery = await prisma.deliveries.findUnique({
     where: { orderId: id },
-    include: { order: true },
+    include: { orders: true },
   })
   
   if (!delivery) {
@@ -46,7 +46,7 @@ export async function POST(
       }
     }
     
-    const updated = await prisma.delivery.update({
+    const updated = await prisma.deliveries.update({
       where: { id: delivery.id },
       data: {
         assignedToId: assignedUserId,
@@ -54,7 +54,8 @@ export async function POST(
       },
     })
     
-    await prisma.activityLog.create({
+    // Log activity
+    await prisma.activity_logs.create({
       data: {
         orderId: id,
         actorId: session.user.id,
@@ -103,7 +104,7 @@ export async function POST(
     }
     
     // Update delivery
-    const updatedDelivery = await prisma.delivery.update({
+    const updatedDelivery = await prisma.deliveries.update({
       where: { id: delivery.id },
       data: {
         signatureUrl: signatureUrl || undefined,
@@ -116,7 +117,7 @@ export async function POST(
     })
     
     // Update order status
-    await prisma.order.update({
+    await prisma.orders.update({
       where: { id },
       data: { status: 'DELIVERED' },
     })
@@ -125,17 +126,17 @@ export async function POST(
     let shopifySynced = false
     try {
       // First update the order status (adds tag)
-      const statusUpdated = await updateShopifyOrderStatus(delivery.order.shopifyId, 'DELIVERED')
+      const statusUpdated = await updateShopifyOrderStatus(delivery.orders.shopifyId, 'DELIVERED')
       
       // Then create fulfillment (actually marks as fulfilled)
-      const fulfillmentCreated = await createFulfillment(delivery.order.shopifyId)
+      const fulfillmentCreated = await createFulfillment(delivery.orders.shopifyId)
       
       shopifySynced = statusUpdated && fulfillmentCreated
     } catch (error) {
       console.error('Shopify sync error:', error)
     }
     
-    await prisma.order.update({
+    await prisma.orders.update({
       where: { id },
       data: {
         shopifySyncStatus: shopifySynced ? 'SYNCED' : 'FAILED',
@@ -144,7 +145,7 @@ export async function POST(
     })
     
     // Log activity
-    await prisma.activityLog.create({
+    await prisma.activity_logs.create({
       data: {
         orderId: id,
         actorId: session.user.id,
@@ -152,7 +153,7 @@ export async function POST(
         action: 'delivery_completed',
         entityType: 'delivery',
         fieldName: 'status',
-        oldValue: delivery.order.status,
+        oldValue: delivery.orders.status,
         newValue: 'DELIVERED',
         notes: `Delivery completed. Signature: ${signatureUrl ? 'Yes' : 'No'}, Photo: ${photoUrl ? 'Yes' : 'No'}`,
       },
