@@ -134,7 +134,7 @@ export async function syncDeliveryToHubSpot(deliveryId: string): Promise<boolean
     return false
   }
 
-  const delivery = await prisma.delivery.findUnique({
+  const delivery = await prisma.deliveries.findUnique({
     where: { id: deliveryId },
     include: {
       order: {
@@ -169,7 +169,7 @@ export async function syncDeliveryToHubSpot(deliveryId: string): Promise<boolean
   }
 
   // Update customer record with HubSpot ID
-  await prisma.customer.update({
+  await prisma.customers.update({
     where: { id: customer.id },
     data: { hubspotId: hubspotContactId },
   })
@@ -185,7 +185,7 @@ export async function syncDeliveryToHubSpot(deliveryId: string): Promise<boolean
   })
 
   if (hubspotDealId) {
-    await prisma.delivery.update({
+    await prisma.deliveries.update({
       where: { id: deliveryId },
       data: {
         hubspotSynced: true,
@@ -205,7 +205,7 @@ export async function syncOrderToHubSpot(orderId: string): Promise<boolean> {
     return false
   }
 
-  const order = await prisma.order.findUnique({
+  const order = await prisma.orders.findUnique({
     where: { id: orderId },
     include: {
       customer: true,
@@ -236,7 +236,7 @@ export async function syncOrderToHubSpot(orderId: string): Promise<boolean> {
   }
 
   // Update customer record with HubSpot ID
-  await prisma.customer.update({
+  await prisma.customers.update({
     where: { id: customer.id },
     data: { hubspotId: hubspotContactId },
   })
@@ -253,7 +253,7 @@ export async function syncOrderToHubSpot(orderId: string): Promise<boolean> {
 
   if (hubspotDealId) {
     // Update order with HubSpot sync info
-    await prisma.order.update({
+    await prisma.orders.update({
       where: { id: orderId },
       data: {
         hubspotSynced: true,
