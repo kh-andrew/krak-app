@@ -89,9 +89,9 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
-  const [deliveryNotes, setDeliveryNotes] = useState(order.delivery?.deliveryNotes || '');
-  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(order.delivery?.photoUrl || null);
-  const [signatureData, setSignatureData] = useState<string | null>(order.delivery?.signatureUrl || null);
+  const [deliveryNotes, setDeliveryNotes] = useState(order.deliveries?.deliveryNotes || '');
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(order.deliveries?.photoUrl || null);
+  const [signatureData, setSignatureData] = useState<string | null>(order.deliveries?.signatureUrl || null);
   const [activeTab, setActiveTab] = useState<'details' | 'delivery'>('details');
 
   const clearSignature = useCallback(() => {
@@ -199,8 +199,8 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
     return colors[status] || 'bg-[#2A2A2A] text-gray-300 border border-[#3A3A3A]';
   };
 
-  const customerName = order.customer 
-    ? `${order.customer.firstName || ''} ${order.customer.lastName || ''}`.trim() || 'Unknown'
+  const customerName = order.customers 
+    ? `${order.customers.firstName || ''} ${order.customers.lastName || ''}`.trim() || 'Unknown'
     : 'Unknown';
 
   return (
@@ -266,15 +266,15 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
               <h2 className="text-base font-semibold text-white mb-3">Customer</h2>
               <div className="space-y-2 text-sm">
                 <p className="text-white font-medium">{customerName}</p>
-                <p className="text-gray-400">{order.customer?.email}</p>
-                {order.customer?.phone && (
-                  <p className="text-gray-400">{order.customer.phone}</p>
+                <p className="text-gray-400">{order.customers?.email}</p>
+                {order.customers?.phone && (
+                  <p className="text-gray-400">{order.customers.phone}</p>
                 )}
                 <p className="text-gray-500 text-xs mt-2">
-                  {order.customer?.address}
-                  {order.customer?.city && `, ${order.customer.city}`}
-                  {order.customer?.postalCode && ` ${order.customer.postalCode}`}
-                  {order.customer?.country && `, ${order.customer.country}`}
+                  {order.customers?.address}
+                  {order.customers?.city && `, ${order.customers.city}`}
+                  {order.customers?.postalCode && ` ${order.customers.postalCode}`}
+                  {order.customers?.country && `, ${order.customers.country}`}
                 </p>
               </div>
             </div>
@@ -303,10 +303,10 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
             <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-4">
               <h2 className="text-base font-semibold text-white mb-3">Activity</h2>
               <div className="space-y-3 max-h-64 overflow-y-auto">
-                {order.activityLogs.length === 0 ? (
+                {order.activity_logss.length === 0 ? (
                   <p className="text-gray-400 text-sm">No activity yet.</p>
                 ) : (
-                  order.activityLogs.map((log) => (
+                  order.activity_logss.map((log) => (
                     <div key={log.id} className="flex items-start space-x-2">
                       <div className="w-1.5 h-1.5 mt-2 rounded-full bg-[#FF6B4A] flex-shrink-0" />
                       <div className="flex-1 min-w-0">
@@ -331,22 +331,22 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
             <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-4">
               <h2 className="text-base font-semibold text-white mb-3">Delivery Info</h2>
               
-              {order.delivery ? (
+              {order.deliveries ? (
                 <div className="space-y-3 text-sm">
                   <div>
                     <p className="text-gray-500 text-xs">Address</p>
-                    <p className="text-gray-300">{order.delivery.deliveryAddress}</p>
+                    <p className="text-gray-300">{order.deliveries.deliveryAddress}</p>
                   </div>
                   
-                  {order.delivery.assignedTo && (
+                  {order.deliveries.users && (
                     <div className="bg-[#FF6B4A]/10 border border-[#FF6B4A]/30 rounded-lg p-3">
                       <p className="text-gray-500 text-xs">Currently Assigned To</p>
                       <div className="flex items-center gap-2 mt-1">
                         <div className="w-8 h-8 rounded-full bg-[#FF6B4A] flex items-center justify-center text-sm font-medium text-white">
-                          {(order.delivery.assignedTo.name || order.delivery.assignedTo.email).charAt(0).toUpperCase()}
+                          {(order.deliveries.users.name || order.deliveries.users.email).charAt(0).toUpperCase()}
                         </div>
                         <p className="text-white font-medium">
-                          {order.delivery.assignedTo.name || order.delivery.assignedTo.email}
+                          {order.deliveries.users.name || order.deliveries.users.email}
                         </p>
                       </div>
                     </div>
@@ -354,13 +354,13 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
 
                   {/* Assign Driver */}
                   <div className="pt-3 border-t border-[#2A2A2A]">
-                    <p className="text-sm font-medium text-white mb-2">{order.delivery.assignedTo ? 'Change Driver' : 'Assign Driver'}</p>
+                    <p className="text-sm font-medium text-white mb-2">{order.deliveries.users ? 'Change Driver' : 'Assign Driver'}</p>
                     {isAssigning && (
                       <p className="text-xs text-gray-400 mb-2">Assigning...</p>
                     )}
                     <div className="space-y-2 max-h-48 overflow-y-auto">
                       {users.map((user) => {
-                        const isAssigned = order.delivery?.assignedTo?.email === user.email;
+                        const isAssigned = order.deliveries?.assignedTo?.email === user.email;
                         return (
                           <button
                             key={user.id}
@@ -400,7 +400,7 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
             </div>
 
             {/* Complete Delivery */}
-            {order.delivery && order.status !== 'DELIVERED' && (
+            {order.deliveries && order.status !== 'DELIVERED' && (
               <div className="bg-[#141414] rounded-xl border border-[#2A2A2A] p-4">
                 <h2 className="text-base font-semibold text-white mb-4">Complete Delivery</h2>
                 

@@ -88,15 +88,15 @@ export default async function DeliveriesPage() {
                 <tr key={delivery.id} className="hover:bg-[#1A1A1A] transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-white">
-                      #{delivery.order.shopifyOrderNumber || delivery.order.id.slice(0, 8)}
+                      #{delivery.orders.shopifyOrderNumber || delivery.orders.id.slice(0, 8)}
                     </div>
                   </td>
                   
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-white">
-                      {delivery.order.customer?.firstName} {delivery.order.customer?.lastName}
+                      {delivery.orders.customer?.firstName} {delivery.orders.customer?.lastName}
                     </div>
-                    <div className="text-sm text-gray-400">{delivery.order.customer?.email}</div>
+                    <div className="text-sm text-gray-400">{delivery.orders.customer?.email}</div>
                   </td>
                   
                   <td className="px-6 py-4">
@@ -113,13 +113,13 @@ export default async function DeliveriesPage() {
                   
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-white">
-                      {delivery.assignedTo?.name || '—'}
+                      {delivery.users?.name || '—'}
                     </div>
                   </td>
                   
                   <td className="px-6 py-4 whitespace-nowrap text-right">
                     <Link
-                      href={`/dashboard/orders/${delivery.order.id}`}
+                      href={`/dashboard/orders/${delivery.orders.id}`}
                       className="text-[#FF6B4A] hover:text-[#FF8566] text-sm font-medium"
                     >
                       View Order

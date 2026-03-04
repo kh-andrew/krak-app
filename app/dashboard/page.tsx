@@ -180,9 +180,9 @@ export default async function DashboardPage({
                       </span>
                     </div>
                     <p className="text-gray-300 text-sm truncate">
-                      {order.customer?.firstName} {order.customer?.lastName}
+                      {order.customers?.firstName} {order.customers?.lastName}
                     </p>
-                    <p className="text-gray-500 text-xs truncate">{order.customer?.email}</p>
+                    <p className="text-gray-500 text-xs truncate">{order.customers?.email}</p>
                     
                     <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
                       <span>{formatCurrency(Number(order.totalAmount), order.currency)}</span>
@@ -230,8 +230,8 @@ export default async function DashboardPage({
                       <span className="text-white font-medium">#{order.shopifyOrderNumber || order.id.slice(0, 8)}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-white">{order.customer?.firstName} {order.customer?.lastName}</div>
-                      <div className="text-gray-400 text-sm">{order.customer?.email}</div>
+                      <div className="text-white">{order.customers?.firstName} {order.customers?.lastName}</div>
+                      <div className="text-gray-400 text-sm">{order.customers?.email}</div>
                     </td>
                     <td className="px-6 py-4 text-white">{formatCurrency(Number(order.totalAmount), order.currency)}</td>
                     <td className="px-6 py-4">
@@ -239,7 +239,7 @@ export default async function DashboardPage({
                         {statusConfig?.label || order.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-white">{order.delivery?.assignedTo?.name || '—'}</td>
+                    <td className="px-6 py-4 text-white">{order.deliveries?.assignedTo?.name || '—'}</td>
                     <td className="px-6 py-4 text-gray-400">{formatDate(order.createdAt)}</td>
                     <td className="px-6 py-4 text-right">
                       <Link
