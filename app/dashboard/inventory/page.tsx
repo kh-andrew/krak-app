@@ -9,7 +9,7 @@ export default async function InventoryPage() {
   let error = null
 
   try {
-    const response = await fetch('https://krak-app.vercel.app/api/inventory', {
+    const response = await fetch(`https://krak-app.vercel.app/api/inventory?t=${Date.now()}`, {
       cache: 'no-store'
     })
     if (!response.ok) throw new Error('Failed to fetch')
