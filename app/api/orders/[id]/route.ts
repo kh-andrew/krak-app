@@ -17,7 +17,7 @@ export async function GET(
   await requireAuth()
   const { id } = await params
   
-  const order = await prisma.order.findUnique({
+  const order = await prisma.orders.findUnique({
     where: { id },
     include: {
       customer: true,
@@ -62,7 +62,7 @@ export async function PATCH(
   
   const { status, notes } = parsed.data
   
-  const order = await prisma.order.findUnique({
+  const order = await prisma.orders.findUnique({
     where: { id },
     include: { delivery: true },
   })
@@ -72,7 +72,7 @@ export async function PATCH(
   }
   
   // Update order status
-  const updatedOrder = await prisma.order.update({
+  const updatedOrder = await prisma.orders.update({
     where: { id },
     data: { status },
   })
@@ -80,7 +80,7 @@ export async function PATCH(
   // Sync to Shopify
   const shopifySynced = await updateShopifyOrderStatus(order.shopifyId, status)
   
-  await prisma.order.update({
+  await prisma.orders.update({
     where: { id },
     data: {
       shopifySyncStatus: shopifySynced ? 'SYNCED' : 'FAILED',
@@ -89,7 +89,7 @@ export async function PATCH(
   })
   
   // Log activity (lean schema)
-  await prisma.activityLog.create({
+  await prisma.activity_logs.create({
     data: {
       orderId: id,
       actorId: session.user.id,
@@ -105,7 +105,7 @@ export async function PATCH(
   
   // If delivered, sync to HubSpot
   if (status === 'DELIVERED' && order.delivery) {
-    await prisma.delivery.update({
+    await prisma.deliveries.update({
       where: { id: order.delivery.id },
       data: { deliveredAt: new Date() },
     })

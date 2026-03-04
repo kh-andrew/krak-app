@@ -8,7 +8,7 @@ export async function GET() {
   await requireAuth()
   
   try {
-    const orders = await prisma.order.findMany({
+    const orders = await prisma.orders.findMany({
       where: {
         status: {
           in: ['RECEIVED', 'PREPARING', 'OUT_FOR_DELIVERY']

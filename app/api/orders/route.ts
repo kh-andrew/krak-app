@@ -5,7 +5,7 @@ import { requireAuth } from '@/lib/auth-helpers'
 export async function GET() {
   await requireAuth()
   
-  const orders = await prisma.order.findMany({
+  const orders = await prisma.orders.findMany({
     include: {
       customer: true,
       delivery: {

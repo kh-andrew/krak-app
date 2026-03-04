@@ -57,7 +57,7 @@ async function processOrderCreate(payload: any) {
   const { id, name, email, total_price, currency, line_items, customer, shipping_address } = payload
 
   // Upsert customer
-  const customerData = await prisma.customer.upsert({
+  const customerData = await prisma.customers.upsert({
     where: { 
       email: email || customer?.email || `order-${id}@placeholder.com`
     },
@@ -84,7 +84,7 @@ async function processOrderCreate(payload: any) {
   })
 
   // Create order
-  const order = await prisma.order.create({
+  const order = await prisma.orders.create({
     data: {
       shopifyId: id?.toString(),
       shopifyOrderNumber: name,
@@ -103,7 +103,7 @@ async function processOrderCreate(payload: any) {
   })
 
   // Create delivery record
-  await prisma.delivery.create({
+  await prisma.deliveries.create({
     data: {
       orderId: order.id,
       deliveryAddress: [
@@ -118,7 +118,7 @@ async function processOrderCreate(payload: any) {
   })
 
   // Log activity (lean schema)
-  await prisma.activityLog.create({
+  await prisma.activity_logs.create({
     data: {
       orderId: order.id,
       action: 'order_received',

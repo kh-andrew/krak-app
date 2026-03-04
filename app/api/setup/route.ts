@@ -13,7 +13,7 @@ const setupSchema = z.object({
 // Should be disabled after first setup
 export async function POST(req: Request) {
   // Check if any users exist
-  const userCount = await prisma.user.count()
+  const userCount = await prisma.users.count()
   
   if (userCount > 0) {
     return NextResponse.json(
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
 
   const hashedPassword = await bcrypt.hash(password, 12)
 
-  const user = await prisma.user.create({
+  const user = await prisma.users.create({
     data: {
       email,
       password: hashedPassword,
