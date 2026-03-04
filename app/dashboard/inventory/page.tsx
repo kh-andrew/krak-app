@@ -23,8 +23,16 @@ export default async function InventoryPage() {
     i.reorderPoint && i.available <= i.reorderPoint
   ).length
   
+  // Get quantities by SKU type
+  const kfss = inventory.find((i: any) => i.sku === 'KFSS')
+  const kfsp = inventory.find((i: any) => i.sku === 'KFSP')
+  const kfsb = inventory.find((i: any) => i.sku === 'KFSB')
+  
+  const bottles = kfss?.available || 0
+  const packs = kfsp?.available || 0
+  const boxes = kfsb?.available || 0
+  
   const totalUnits = inventory.reduce((sum: number, i: any) => sum + (i.currentStock || 0), 0)
-  const totalAvailable = inventory.reduce((sum: number, i: any) => sum + (i.available || 0), 0)
   
   return (
     <div className="min-h-screen bg-[#0A0A0A] pb-20">
@@ -73,9 +81,22 @@ export default async function InventoryPage() {
             <p className="text-xs text-gray-400">Total Units</p>
             <p className="text-2xl font-bold text-white">{totalUnits.toLocaleString()}</p>
           </div>
-          <div className="bg-[#141414] p-4 rounded-xl border border-[#2A2A2A] text-center">
-            <p className="text-xs text-gray-400">Available</p>
-            <p className="text-2xl font-bold text-[#22C55E]">{totalAvailable.toLocaleString()}</p>
+          <div className="bg-[#141414] p-4 rounded-xl border border-[#2A2A2A]">
+            <p className="text-xs text-gray-400 text-center mb-2">Available</p>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Bottles</span>
+                <span className="font-semibold text-white">{bottles.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Packs</span>
+                <span className="font-semibold text-white">{packs.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Boxes</span>
+                <span className="font-semibold text-white">{boxes.toLocaleString()}</span>
+              </div>
+            </div>
           </div>
         </div>
 
