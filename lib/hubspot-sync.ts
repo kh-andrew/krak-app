@@ -137,20 +137,20 @@ export async function syncDeliveryToHubSpot(deliveryId: string): Promise<boolean
   const delivery = await prisma.deliveries.findUnique({
     where: { id: deliveryId },
     include: {
-      order: {
+      orders: {
         include: {
-          customer: true,
+          customers: true,
         },
       },
     },
   })
 
-  if (!delivery || !delivery.order.customer) {
+  if (!delivery || !delivery.orders.customers) {
     return false
   }
 
-  const customer = delivery.order.customer
-  const order = delivery.order
+  const customer = delivery.orders.customers
+  const order = delivery.orders
 
   // Sync customer
   const hubspotContactId = await syncCustomerToHubSpot({
@@ -208,16 +208,16 @@ export async function syncOrderToHubSpot(orderId: string): Promise<boolean> {
   const order = await prisma.orders.findUnique({
     where: { id: orderId },
     include: {
-      customer: true,
-      delivery: true,
+      customers: true,
+      deliveries: true,
     },
   })
 
-  if (!order || !order.customer) {
+  if (!order || !order.customers) {
     return false
   }
 
-  const customer = order.customer
+  const customer = order.customers
 
   // Sync customer to HubSpot
   const hubspotContactId = await syncCustomerToHubSpot({
@@ -247,7 +247,7 @@ export async function syncOrderToHubSpot(orderId: string): Promise<boolean> {
     shopifyOrderNumber: order.shopifyOrderNumber,
     totalAmount: Number(order.totalAmount),
     currency: order.currency,
-    deliveredAt: order.delivery?.deliveredAt || null,
+    deliveredAt: order.deliveries?.deliveredAt || null,
     lineItems: order.lineItems as any[],
   }, order.status)
 
