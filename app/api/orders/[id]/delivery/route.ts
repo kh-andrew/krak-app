@@ -38,7 +38,7 @@ export async function POST(
     // Find or create user if assigning by email
     let assignedUserId = assignToId
     if (driverEmail) {
-      const user = await prisma.user.findUnique({
+      const user = await prisma.users.findUnique({
         where: { email: driverEmail }
       })
       if (user) {
