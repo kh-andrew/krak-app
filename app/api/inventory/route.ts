@@ -8,7 +8,7 @@ export async function GET() {
       take: 100,
       orderBy: { available: 'asc' },
       include: {
-        product: {
+        Product: {
           select: {
             id: true,
             sku: true,
@@ -28,10 +28,10 @@ export async function GET() {
       available: item.available || 0,
       reorderPoint: item.reorderPoint,
       reorderQty: item.reorderQty,
-      sku: item.product?.sku || 'UNKNOWN',
-      name: item.product?.name || 'Unknown',
-      basePrice: item.product?.basePrice || 0,
-      isBundle: item.product?.isBundle || false
+      sku: item.Product?.sku || 'UNKNOWN',
+      name: item.Product?.name || 'Unknown',
+      basePrice: item.Product?.basePrice || 0,
+      isBundle: item.Product?.isBundle || false
     }))
     
     return NextResponse.json(formatted)

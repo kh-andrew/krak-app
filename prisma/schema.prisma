@@ -238,30 +238,33 @@ model deliveries {
 }
 
 model inventory {
-  id              String   @id
-  sku             String   @unique
-  name            String
-  currentStock    Int      @default(0)
-  reserved        Int      @default(0)
-  available       Int      @default(0)
+  id              String     @id(map: "inventory_new_pkey") @default(dbgenerated("gen_random_uuid()"))
+  productId       String
+  locationId      String?
+  currentStock    Int?       @default(0)
+  reserved        Int?       @default(0)
+  available       Int?       @default(0)
   reorderPoint    Int?
   reorderQty      Int?
-  lastAgentAction String?
-  agentConfidence Float?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime
+  reorderLeadTime Int?       @default(7)
+  lastCountedAt   DateTime?  @db.Timestamp(6)
+  lastMovementAt  DateTime?  @db.Timestamp(6)
+  locations       locations? @relation(fields: [locationId], references: [id], map: "inventory_locationid_fkey")
+  products        products   @relation(fields: [productId], references: [id], map: "inventory_productid_fkey")
 
-  @@index([available])
-  @@index([sku])
+  @@unique([productId, locationId], map: "inventory_new_productId_locationId_key")
+  @@index([locationId], map: "inventory_locationid_idx")
+  @@index([productId], map: "inventory_productid_idx")
 }
 
 model locations {
-  id       String   @id @default(dbgenerated("gen_random_uuid()"))
-  code     String   @unique
-  name     String
-  type     String?  @default("warehouse")
-  isactive Boolean? @default(true)
-  address  String?
+  id        String      @id @default(dbgenerated("gen_random_uuid()"))
+  code      String      @unique
+  name      String
+  type      String?     @default("warehouse")
+  isactive  Boolean?    @default(true)
+  address   String?
+  inventory inventory[]
 }
 
 model orders {
@@ -297,10 +300,11 @@ model playing_with_neon {
 }
 
 model products {
-  id        String   @id @default(dbgenerated("gen_random_uuid()"))
-  sku       String   @unique
+  id        String      @id @default(dbgenerated("gen_random_uuid()"))
+  sku       String      @unique
   name      String
-  basePrice Decimal? @default(0) @db.Decimal(10, 2)
+  basePrice Decimal?    @default(0) @db.Decimal(10, 2)
+  inventory inventory[]
 }
 
 model test_table {
