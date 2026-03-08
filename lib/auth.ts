@@ -3,7 +3,14 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 
+const secret = process.env.NEXTAUTH_SECRET
+
+if (!secret) {
+  console.warn('[AUTH] NEXTAUTH_SECRET not set! Using fallback for development only.')
+}
+
 export const authOptions = {
+  secret: secret || 'fallback-secret-do-not-use-in-production',
   session: {
     strategy: 'jwt' as const,
   },
@@ -65,6 +72,7 @@ export const authOptions = {
       return session
     },
   },
+  debug: process.env.NODE_ENV === 'development',
 }
 
 export default NextAuth(authOptions)
