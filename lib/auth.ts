@@ -3,7 +3,6 @@ import Credentials from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
-import { checkRateLimit, recordSuccessfulLogin } from '@/lib/rate-limit'
 
 const credentialsSchema = z.object({
   email: z.string().email(),
@@ -22,23 +21,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
       },
-      async authorize(credentials, req) {
-        // Rate limiting by IP + email
-        const ip = req?.headers?.get('x-forwarded-for') || 'unknown'
-        const identifier = `${ip}:${credentials?.email || 'unknown'}`
-        
-        const rateLimit = checkRateLimit(identifier)
-        if (!rateLimit.allowed) {
-          const blockedMinutes = rateLimit.blockedUntil 
-            ? Math.ceil((rateLimit.blockedUntil - Date.now()) / 60000)
-            : 30
-          throw new Error(`Too many attempts. Try again in ${blockedMinutes} minutes.`)
-        }
-        
+      async authorize(credentials) {
         const parsed = credentialsSchema.safeParse(credentials)
-        if (!parsed.success) {
-          return null
-        }
+        if (!parsed.success) return null
 
         const { email, password } = parsed.data
 
@@ -47,17 +32,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             where: { email },
           })
 
-          if (!user || !user.isActive) {
-            return null
-          }
+          if (!user || !user.isActive) return null
 
           const isValid = await bcrypt.compare(password, user.password)
-          if (!isValid) {
-            return null
-          }
-          
-          // Record successful login to reset rate limit
-          recordSuccessfulLogin(identifier)
+          if (!isValid) return null
 
           return {
             id: user.id,
