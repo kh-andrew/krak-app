@@ -1,4 +1,4 @@
-import { auth, signOut } from '@/lib/auth'
+import { requireAuth } from '@/lib/auth-helpers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -8,11 +8,7 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const session = await auth()
-  
-  if (!session?.user) {
-    redirect('/login')
-  }
+  const session = await requireAuth()
   
   return (
     <div className="min-h-screen bg-[#0A0A0A]">
@@ -53,22 +49,15 @@ export default async function DashboardLayout({
             
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-400">
-                {session.user.name || session.user.email}
+                {(session.user as any).name || session.user?.email}
               </span>
               
-              <form
-                action={async () => {
-                  'use server'
-                  await signOut({ redirectTo: '/login' })
-                }}
+              <a
+                href="/api/auth/signout"
+                className="text-sm text-gray-400 hover:text-[#FF6B4A] transition-colors"
               >
-                <button
-                  type="submit"
-                  className="text-sm text-gray-400 hover:text-[#FF6B4A] transition-colors"
-                >
-                  Sign Out
-                </button>
-              </form>
+                Sign Out
+              </a>
             </div>
           </div>
         </div>

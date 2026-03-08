@@ -1,106 +1,70 @@
 import NextAuth from 'next-auth'
-import Credentials from 'next-auth/providers/credentials'
+import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
 
-const credentialsSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
-})
-
-// Get secret from environment
-const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET
-
-if (!secret) {
-  console.warn('[AUTH] WARNING: No AUTH_SECRET or NEXTAUTH_SECRET set. Using fallback for development only.')
-}
-
-export const { handlers, signIn, signOut, auth } = NextAuth({
-  secret: secret || 'development-secret-do-not-use-in-production',
-  trustHost: true,
-  session: { strategy: 'jwt' },
+export const authOptions = {
+  session: {
+    strategy: 'jwt' as const,
+  },
   pages: {
     signIn: '/login',
   },
   providers: [
-    Credentials({
+    CredentialsProvider({
       name: 'credentials',
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          return null
+        }
+
         try {
-          console.log('[AUTH] Authorize called with email:', credentials?.email)
-          
-          const parsed = credentialsSchema.safeParse(credentials)
-          if (!parsed.success) {
-            console.log('[AUTH] Invalid credentials format:', parsed.error)
-            return null
-          }
-
-          const { email, password } = parsed.data
-          console.log('[AUTH] Looking up user:', email)
-
           const user = await prisma.users.findUnique({
-            where: { email },
+            where: { email: credentials.email },
           })
 
-          if (!user) {
-            console.log('[AUTH] User not found:', email)
-            return null
-          }
-          
-          if (!user.isActive) {
-            console.log('[AUTH] User deactivated:', email)
+          if (!user || !user.isActive) {
             return null
           }
 
-          console.log('[AUTH] User found, checking password')
-          const isValid = await bcrypt.compare(password, user.password)
+          const isValid = await bcrypt.compare(credentials.password, user.password)
           if (!isValid) {
-            console.log('[AUTH] Invalid password for:', email)
             return null
           }
 
-          console.log('[AUTH] Successful login:', email)
           return {
             id: user.id,
             email: user.email,
             name: user.name,
             role: user.role,
           }
-        } catch (error: any) {
-          console.error('[AUTH_ERROR]', error.message, error.stack)
+        } catch (error) {
+          console.error('[AUTH_ERROR]', error)
           return null
         }
       },
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }: { token: any; user: any }) {
       if (user) {
         token.id = user.id
         token.role = user.role
       }
       return token
     },
-    async session({ session, token }) {
+    async session({ session, token }: { session: any; token: any }) {
       if (token) {
-        session.user.id = token.id as string
-        session.user.role = token.role as string
+        session.user.id = token.id
+        session.user.role = token.role
       }
       return session
     },
   },
-  events: {
-    async signIn(message) {
-      console.log('[AUTH_EVENT] signIn:', message)
-    },
-    async error(message) {
-      console.error('[AUTH_EVENT] error:', message)
-    },
-  },
-  debug: process.env.NODE_ENV === 'development',
-})
+}
+
+export default NextAuth(authOptions)

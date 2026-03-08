@@ -1,15 +1,16 @@
-import { auth } from '@/lib/auth'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { UserRole } from '@prisma/client'
 
 export async function requireAuth(role?: UserRole) {
-  const session = await auth()
+  const session = await getServerSession(authOptions)
   
   if (!session?.user) {
     redirect('/login')
   }
   
-  if (role && session.user.role !== role) {
+  if (role && (session.user as any).role !== role) {
     redirect('/unauthorized')
   }
   
@@ -17,6 +18,6 @@ export async function requireAuth(role?: UserRole) {
 }
 
 export async function getCurrentUser() {
-  const session = await auth()
+  const session = await getServerSession(authOptions)
   return session?.user ?? null
 }

@@ -1,37 +1,42 @@
-import { signIn } from '@/lib/auth'
-import { redirect } from 'next/navigation'
+'use client'
+
+import { signIn } from 'next-auth/react'
+import { useState } from 'react'
 import Image from 'next/image'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 export default function LoginPage() {
-  async function handleSubmit(formData: FormData) {
-    'use server'
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const error = searchParams.get('error')
+  
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
     
-    const email = formData.get('email') as string
-    const password = formData.get('password') as string
-    
-    console.log('[LOGIN] Attempting login for:', email?.slice(0, 3) + '***')
-    
-    let result
     try {
-      result = await signIn('credentials', {
+      const result = await signIn('credentials', {
         email,
         password,
         redirect: false,
       })
-    } catch (signInError: any) {
-      console.error('[LOGIN] signIn threw error:', signInError.message)
-      redirect('/login?error=server')
+      
+      if (result?.error) {
+        router.push('/login?error=invalid')
+      } else {
+        router.push('/dashboard')
+        router.refresh()
+      }
+    } catch (error) {
+      console.error('[LOGIN_ERROR]', error)
+      router.push('/login?error=server')
+    } finally {
+      setLoading(false)
     }
-    
-    console.log('[LOGIN] Result:', result)
-    
-    if (!result || result.error) {
-      console.log('[LOGIN] Failed:', result?.error || 'no result')
-      redirect('/login?error=invalid')
-    }
-    
-    console.log('[LOGIN] Success, redirecting to dashboard')
-    redirect('/dashboard')
   }
   
   return (
@@ -55,9 +60,15 @@ export default function LoginPage() {
           <p className="mt-2 text-center text-sm text-gray-400">
             Sign in to manage orders and deliveries
           </p>
+          
+          {error && (
+            <p className="mt-2 text-center text-sm text-red-400">
+              {error === 'invalid' ? 'Invalid email or password' : 'Server error. Please try again.'}
+            </p>
+          )}
         </div>
         
-        <form action={handleSubmit} className="mt-8 space-y-6">
+        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
           <div className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-300">
@@ -68,6 +79,8 @@ export default function LoginPage() {
                 name="email"
                 type="email"
                 required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="mt-1 block w-full px-3 py-3 bg-[#1A1A1A] border border-[#333] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#FF6B4A] focus:border-transparent"
                 placeholder="you@company.com"
               />
@@ -82,6 +95,8 @@ export default function LoginPage() {
                 name="password"
                 type="password"
                 required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="mt-1 block w-full px-3 py-3 bg-[#1A1A1A] border border-[#333] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#FF6B4A] focus:border-transparent"
                 placeholder="••••••••"
               />
@@ -90,30 +105,10 @@ export default function LoginPage() {
           
           <button
             type="submit"
-            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-[#0A0A0A] bg-[#FF6B4A] hover:bg-[#FF8566] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#FF6B4A] focus:ring-offset-[#0A0A0A] transition-colors"
+            disabled={loading}
+            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-[#0A0A0A] bg-[#FF6B4A] hover:bg-[#FF8566] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#FF6B4A] focus:ring-offset-[#0A0A0A] transition-colors disabled:opacity-50"
           >
-            Sign In
-          </button>
-        </form>
-      </div>
-    </div>
-  )
-}
-                id="password"
-                name="password"
-                type="password"
-                required
-                className="mt-1 block w-full px-3 py-3 bg-[#1A1A1A] border border-[#333] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#FF6B4A] focus:border-transparent"
-                placeholder="••••••••"
-              />
-            </div>
-          </div>
-          
-          <button
-            type="submit"
-            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-[#0A0A0A] bg-[#FF6B4A] hover:bg-[#FF8566] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#FF6B4A] focus:ring-offset-[#0A0A0A] transition-colors"
-          >
-            Sign In
+            {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
       </div>
