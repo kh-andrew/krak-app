@@ -1,68 +1,44 @@
-import { prisma } from '../lib/prisma'
+import { PrismaClient } from '@prisma/client'
+import { randomUUID } from 'crypto'
+
+const prisma = new PrismaClient()
 
 async function seedInventory() {
   console.log('Seeding inventory...')
   
   const sampleInventory = [
     {
-      sku: 'UDT-120',
-      name: 'Unlimited Double Touch - 120',
-      currentStock: 150,
-      reserved: 25,
-      available: 125,
+      sku: 'KFSS',
+      name: 'Krak Single Shot',
+      currentStock: 1000,
+      reserved: 100,
+      available: 900,
+      reorderPoint: 500,
+      reorderQty: 1000,
+    },
+    {
+      sku: 'KFSP',
+      name: 'Krak Shot Pack (12x)',
+      currentStock: 100,
+      reserved: 10,
+      available: 90,
       reorderPoint: 50,
       reorderQty: 100,
     },
     {
-      sku: 'UDT-103',
-      name: 'Unlimited Double Touch - 103',
-      currentStock: 80,
-      reserved: 15,
-      available: 65,
-      reorderPoint: 40,
-      reorderQty: 80,
-    },
-    {
-      sku: '3D-HYDRA-001',
-      name: '3D Hydra Lip Oil - 01',
-      currentStock: 200,
-      reserved: 50,
-      available: 150,
-      reorderPoint: 75,
-      reorderQty: 150,
-    },
-    {
-      sku: '3D-HYDRA-002',
-      name: '3D Hydra Lip Oil - 02',
-      currentStock: 30,
-      reserved: 10,
-      available: 20,
-      reorderPoint: 40,
-      reorderQty: 100,
-    },
-    {
-      sku: 'ONE-HAND-004',
-      name: 'One Hand Lipstick - 04',
-      currentStock: 500,
-      reserved: 100,
-      available: 400,
-      reorderPoint: 150,
-      reorderQty: 300,
-    },
-    {
-      sku: 'ONE-HAND-005',
-      name: 'One Hand Lipstick - 05',
-      currentStock: 15,
+      sku: 'KFSB',
+      name: 'Krak Shot Box (240x)',
+      currentStock: 20,
       reserved: 5,
-      available: 10,
-      reorderPoint: 30,
-      reorderQty: 100,
+      available: 15,
+      reorderPoint: 10,
+      reorderQty: 20,
     },
   ]
   
   for (const item of sampleInventory) {
     try {
-      // Find or create product
+      // Find or create product (PascalCase model -> camelCase in client)
       let product = await prisma.product.findUnique({
         where: { sku: item.sku }
       })
@@ -70,6 +46,7 @@ async function seedInventory() {
       if (!product) {
         product = await prisma.product.create({
           data: {
+            id: randomUUID(),
             sku: item.sku,
             name: item.name,
             basePrice: 0,
@@ -94,6 +71,7 @@ async function seedInventory() {
       } else {
         await prisma.inventory.create({
           data: {
+            id: randomUUID(),
             productId: product.id,
             currentStock: item.currentStock || 0,
             available: item.available || 0,
@@ -103,6 +81,8 @@ async function seedInventory() {
           },
         })
       }
+      
+      console.log(`Seeded ${item.sku}`)
     } catch (error) {
       console.error(`Failed to seed ${item.sku}:`, error)
     }
