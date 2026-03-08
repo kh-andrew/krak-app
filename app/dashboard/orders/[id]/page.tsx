@@ -11,36 +11,39 @@ export default async function OrderDetailPage({
   await requireAuth()
   const { id } = await params
   
-  const order = await prisma.orders.findUnique({
-    where: { id },
-    include: {
-      customers: true,
-      deliveries: {
-        include: {
-          users: {
-            select: { name: true, email: true },
+  // Parallel queries - load order and users simultaneously
+  const [order, users] = await Promise.all([
+    prisma.orders.findUnique({
+      where: { id },
+      include: {
+        customers: true,
+        deliveries: {
+          include: {
+            users: {
+              select: { name: true, email: true },
+            },
           },
         },
-      },
-      activity_logs: {
-        include: {
-          users: {
-            select: { name: true, email: true },
+        activity_logs: {
+          include: {
+            users: {
+              select: { name: true, email: true },
+            },
           },
+          orderBy: { createdAt: 'desc' },
+          take: 50, // Limit activity logs to prevent huge payloads
         },
-        orderBy: { createdAt: 'desc' },
       },
-    },
-  })
+    }),
+    prisma.users.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, email: true },
+    })
+  ])
   
   if (!order) {
     notFound()
   }
-  
-  const users = await prisma.users.findMany({
-    where: { isActive: true },
-    select: { id: true, name: true, email: true },
-  })
   
   // Serialize order data - only include fields that match the interface
   const serializedOrder = {

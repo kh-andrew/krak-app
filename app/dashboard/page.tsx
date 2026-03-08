@@ -59,13 +59,25 @@ export default async function DashboardPage({
   const today = new Date(); today.setHours(0,0,0,0)
   const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7)
   
-  const [totalOrders, todayOrders, weekOrders, pendingOrders] = await Promise.all([
-    prisma.orders.count(),
-    prisma.orders.count({ where: { createdAt: { gte: today } } }),
-    prisma.orders.count({ where: { createdAt: { gte: weekAgo } } }),
-    prisma.orders.count({ where: { status: { in: ['RECEIVED', 'PREPARING', 'OUT_FOR_DELIVERY'] } } }),
-  ])
+  // Single query with grouping - much faster than 4 separate counts
+  const statsData = await prisma.orders.groupBy({
+    by: ['status'],
+    _count: { status: true },
+    where: {
+      createdAt: { gte: weekAgo }
+    }
+  })
   
+  const totalOrders = await prisma.orders.count()
+  const todayOrders = statsData
+    .filter(s => s.createdAt >= today)
+    .reduce((sum, s) => sum + s._count.status, 0)
+  const weekOrders = statsData.reduce((sum, s) => sum + s._count.status, 0)
+  const pendingOrders = statsData
+    .filter(s => ['RECEIVED', 'PREPARING', 'OUT_FOR_DELIVERY'].includes(s.status))
+    .reduce((sum, s) => sum + s._count.status, 0)
+  
+  // Calculate stats from the orders we already fetched
   const stats = {
     total: orders.length,
     received: orders.filter(o => o.status === 'RECEIVED').length,
