@@ -6,29 +6,32 @@ export default function LoginPage() {
   async function handleSubmit(formData: FormData) {
     'use server'
     
+    const email = formData.get('email') as string
+    const password = formData.get('password') as string
+    
+    console.log('[LOGIN] Attempting login for:', email?.slice(0, 3) + '***')
+    
+    let result
     try {
-      const email = formData.get('email') as string
-      const password = formData.get('password') as string
-      
-      console.log('[LOGIN_ATTEMPT]', { email: email?.slice(0, 3) + '***' })
-      
-      const result = await signIn('credentials', {
+      result = await signIn('credentials', {
         email,
         password,
         redirect: false,
       })
-      
-      console.log('[LOGIN_RESULT]', { error: result?.error, ok: result?.ok })
-      
-      if (result?.error) {
-        redirect('/login?error=invalid')
-      }
-      
-      redirect('/dashboard')
-    } catch (error: any) {
-      console.error('[LOGIN_ERROR]', error.message)
+    } catch (signInError: any) {
+      console.error('[LOGIN] signIn threw error:', signInError.message)
       redirect('/login?error=server')
     }
+    
+    console.log('[LOGIN] Result:', result)
+    
+    if (!result || result.error) {
+      console.log('[LOGIN] Failed:', result?.error || 'no result')
+      redirect('/login?error=invalid')
+    }
+    
+    console.log('[LOGIN] Success, redirecting to dashboard')
+    redirect('/dashboard')
   }
   
   return (
@@ -75,6 +78,27 @@ export default function LoginPage() {
                 Password
               </label>
               <input
+                id="password"
+                name="password"
+                type="password"
+                required
+                className="mt-1 block w-full px-3 py-3 bg-[#1A1A1A] border border-[#333] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#FF6B4A] focus:border-transparent"
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
+          
+          <button
+            type="submit"
+            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-[#0A0A0A] bg-[#FF6B4A] hover:bg-[#FF8566] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#FF6B4A] focus:ring-offset-[#0A0A0A] transition-colors"
+          >
+            Sign In
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
                 id="password"
                 name="password"
                 type="password"
