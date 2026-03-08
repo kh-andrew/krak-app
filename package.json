@@ -4,14 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate --schema=./prisma/schema.prisma && next build",
     "start": "next start",
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
-    "postinstall": "prisma generate || true"
+    "postinstall": "prisma generate --schema=./prisma/schema.prisma || echo 'Skipping prisma generate'"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
