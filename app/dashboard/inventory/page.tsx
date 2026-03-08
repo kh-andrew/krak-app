@@ -13,25 +13,21 @@ export default async function InventoryPage() {
     // Direct Prisma query - ~10x faster than API round-trip
     inventory = await prisma.inventory.findMany({
       include: {
-        product: true,
-        location: true,
-        batches: {
-          where: { status: 'AVAILABLE' },
-          select: { quantity: true }
-        }
+        products: true,
+        locations: true
       },
-      orderBy: { updatedAt: 'desc' }
+      orderBy: { lastMovementAt: 'desc' }
     })
     
     // Transform to match expected format
     inventory = inventory.map((item: any) => ({
       id: item.id,
-      sku: item.product?.sku || item.sku,
-      name: item.product?.name || 'Unknown',
-      currentStock: item.quantity,
-      available: item.quantity - (item.reservedQuantity || 0),
+      sku: item.products?.sku || 'Unknown',
+      name: item.products?.name || 'Unknown',
+      currentStock: item.currentStock || 0,
+      available: item.available || 0,
       reorderPoint: item.reorderPoint,
-      location: item.location?.name
+      location: item.locations?.name
     }))
   } catch (e) {
     error = 'Failed to load inventory'
