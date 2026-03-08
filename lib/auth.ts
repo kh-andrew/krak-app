@@ -9,7 +9,12 @@ const credentialsSchema = z.object({
   password: z.string().min(6),
 })
 
+// Generate a consistent secret for JWT signing
+// In production, this should be set via AUTH_SECRET environment variable
+const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || 'fallback-secret-change-in-production'
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  secret,
   trustHost: true,
   session: { strategy: 'jwt' },
   pages: {
@@ -23,21 +28,36 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        const parsed = credentialsSchema.safeParse(credentials)
-        if (!parsed.success) return null
-
-        const { email, password } = parsed.data
-
         try {
+          const parsed = credentialsSchema.safeParse(credentials)
+          if (!parsed.success) {
+            console.log('[AUTH] Invalid credentials format')
+            return null
+          }
+
+          const { email, password } = parsed.data
+
           const user = await prisma.users.findUnique({
             where: { email },
           })
 
-          if (!user || !user.isActive) return null
+          if (!user) {
+            console.log('[AUTH] User not found:', email)
+            return null
+          }
+          
+          if (!user.isActive) {
+            console.log('[AUTH] User deactivated:', email)
+            return null
+          }
 
           const isValid = await bcrypt.compare(password, user.password)
-          if (!isValid) return null
+          if (!isValid) {
+            console.log('[AUTH] Invalid password for:', email)
+            return null
+          }
 
+          console.log('[AUTH] Successful login:', email)
           return {
             id: user.id,
             email: user.email,
