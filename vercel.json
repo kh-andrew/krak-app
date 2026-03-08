@@ -1,3 +1,0 @@
-# Force Vercel to use fresh build
-# This file triggers a new deployment without cache
-BUILD_ID=093f71f
