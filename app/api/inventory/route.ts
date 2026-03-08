@@ -8,12 +8,20 @@ export async function GET() {
       take: 100,
       orderBy: { available: 'asc' },
       include: {
-        products: {
+        Product: {
           select: {
             id: true,
             sku: true,
             name: true,
-            basePrice: true
+            basePrice: true,
+            isBundle: true
+          }
+        },
+        Location: {
+          select: {
+            id: true,
+            code: true,
+            name: true
           }
         }
       }
@@ -27,14 +35,16 @@ export async function GET() {
       available: item.available || 0,
       reorderPoint: item.reorderPoint,
       reorderQty: item.reorderQty,
-      sku: item.products?.sku || 'UNKNOWN',
-      name: item.products?.name || 'Unknown',
-      basePrice: item.products?.basePrice || 0
+      sku: item.Product?.sku || 'UNKNOWN',
+      name: item.Product?.name || 'Unknown',
+      basePrice: item.Product?.basePrice || 0,
+      isBundle: item.Product?.isBundle || false,
+      location: item.Location?.name || item.Location?.code
     }))
     
     return NextResponse.json(formatted)
-  } catch (error) {
-    console.error('GET /api/inventory error:', error)
+  } catch (error: any) {
+    console.error('[API_INVENTORY_GET]', error.message)
     return NextResponse.json({ error: 'Failed to fetch inventory' }, { status: 500 })
   }
 }

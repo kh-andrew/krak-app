@@ -10,28 +10,46 @@ export default async function InventoryPage() {
   let error = null
 
   try {
-    // Direct Prisma query - ~10x faster than API round-trip
-    inventory = await prisma.inventory.findMany({
+    // Direct Prisma query with advanced inventory system
+    const rawInventory = await prisma.inventory.findMany({
+      take: 100,
       include: {
-        products: true,
-        locations: true
+        Product: {
+          select: {
+            id: true,
+            sku: true,
+            name: true,
+            basePrice: true,
+            isBundle: true
+          }
+        },
+        Location: {
+          select: {
+            id: true,
+            code: true,
+            name: true
+          }
+        }
       },
       orderBy: { lastMovementAt: 'desc' }
     })
     
     // Transform to match expected format
-    inventory = inventory.map((item: any) => ({
+    inventory = rawInventory.map((item: any) => ({
       id: item.id,
-      sku: item.products?.sku || 'Unknown',
-      name: item.products?.name || 'Unknown',
+      sku: item.Product?.sku || 'Unknown',
+      name: item.Product?.name || 'Unknown Product',
       currentStock: item.currentStock || 0,
       available: item.available || 0,
+      reserved: item.reserved || 0,
       reorderPoint: item.reorderPoint,
-      location: item.locations?.name
+      reorderQty: item.reorderQty,
+      location: item.Location?.name || item.Location?.code || 'Unknown',
+      isBundle: item.Product?.isBundle || false
     }))
-  } catch (e) {
+  } catch (e: any) {
     error = 'Failed to load inventory'
-    console.error('Inventory load error:', e)
+    console.error('[INVENTORY_PAGE_ERROR]', e.message, e.stack)
   }
 
   const lowStockCount = inventory.filter((i: any) => 
@@ -152,6 +170,9 @@ export default async function InventoryPage() {
                     <div>
                       <p className="text-sm font-mono text-gray-400">{item.sku}</p>
                       <p className="text-white font-medium">{item.name}</p>
+                      {item.isBundle && (
+                        <span className="text-xs text-blue-400">Bundle</span>
+                      )}
                     </div>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                       isLowStock 
@@ -180,6 +201,12 @@ export default async function InventoryPage() {
                       <p className="text-[#FF6B4A]">{item.reorderPoint?.toLocaleString() || '—'}</p>
                     </div>
                   </div>
+                  
+                  {item.location && (
+                    <div className="mt-2 text-xs text-gray-500">
+                      Location: {item.location}
+                    </div>
+                  )}
                 </div>
               )
             })
