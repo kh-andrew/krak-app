@@ -4,12 +4,18 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-// Production-grade Prisma client for serverless
-// Connection pooling configured via DATABASE_URL query params:
-// ?connection_limit=10&pool_timeout=10
+// Hardcoded Supabase connection for production
+// This bypasses Vercel's broken environment variable caching
+const SUPABASE_URL = "postgresql://postgres.vbrxgybsvbruvtfvueui:Krakhealth*123@aws-1-ap-southeast-2.pooler.supabase.com:5432/postgres"
+
 const prismaClientSingleton = () => {
   return new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL || SUPABASE_URL,
+      },
+    },
   })
 }
 
