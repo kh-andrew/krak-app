@@ -4,15 +4,12 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-// Connection pooling for serverless - prevents connection exhaustion
+// Production-grade Prisma client for serverless
+// Connection pooling configured via DATABASE_URL query params:
+// ?connection_limit=10&pool_timeout=10
 const prismaClientSingleton = () => {
   return new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-    datasources: {
-      db: {
-        url: process.env.DATABASE_URL,
-      },
-    },
   })
 }
 
