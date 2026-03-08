@@ -8,13 +8,12 @@ export async function GET() {
       take: 100,
       orderBy: { available: 'asc' },
       include: {
-        Product: {
+        products: {
           select: {
             id: true,
             sku: true,
             name: true,
-            basePrice: true,
-            isBundle: true
+            basePrice: true
           }
         }
       }
@@ -28,10 +27,9 @@ export async function GET() {
       available: item.available || 0,
       reorderPoint: item.reorderPoint,
       reorderQty: item.reorderQty,
-      sku: item.Product?.sku || 'UNKNOWN',
-      name: item.Product?.name || 'Unknown',
-      basePrice: item.Product?.basePrice || 0,
-      isBundle: item.Product?.isBundle || false
+      sku: item.products?.sku || 'UNKNOWN',
+      name: item.products?.name || 'Unknown',
+      basePrice: item.products?.basePrice || 0
     }))
     
     return NextResponse.json(formatted)
