@@ -61,31 +61,50 @@ async function seedInventory() {
   ]
   
   for (const item of sampleInventory) {
-    // Find product by SKU first
-    const product = await prisma.product.findUnique({
-      where: { sku: item.sku }
-    })
-    
-    if (product) {
-      await prisma.inventory.upsert({
-        where: { 
-          id: item.id || `${item.sku}-default`
-        },
-        update: {
-          currentStock: item.currentStock,
-          available: item.available,
-          reserved: item.reserved,
-        },
-        create: {
-          id: item.id || `${item.sku}-default`,
-          productId: product.id,
-          currentStock: item.currentStock || 0,
-          available: item.available || 0,
-          reserved: item.reserved || 0,
-          reorderPoint: item.reorderPoint,
-          reorderQty: item.reorderQty,
-        },
+    try {
+      // Find or create product
+      let product = await prisma.product.findUnique({
+        where: { sku: item.sku }
       })
+      
+      if (!product) {
+        product = await prisma.product.create({
+          data: {
+            sku: item.sku,
+            name: item.name,
+            basePrice: 0,
+          }
+        })
+      }
+      
+      // Check if inventory exists
+      const existingInventory = await prisma.inventory.findFirst({
+        where: { productId: product.id }
+      })
+      
+      if (existingInventory) {
+        await prisma.inventory.update({
+          where: { id: existingInventory.id },
+          data: {
+            currentStock: item.currentStock,
+            available: item.available,
+            reserved: item.reserved,
+          },
+        })
+      } else {
+        await prisma.inventory.create({
+          data: {
+            productId: product.id,
+            currentStock: item.currentStock || 0,
+            available: item.available || 0,
+            reserved: item.reserved || 0,
+            reorderPoint: item.reorderPoint,
+            reorderQty: item.reorderQty,
+          },
+        })
+      }
+    } catch (error) {
+      console.error(`Failed to seed ${item.sku}:`, error)
     }
   }
   
