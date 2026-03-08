@@ -9,12 +9,15 @@ const credentialsSchema = z.object({
   password: z.string().min(6),
 })
 
-// Generate a consistent secret for JWT signing
-// In production, this should be set via AUTH_SECRET environment variable
-const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || 'fallback-secret-change-in-production'
+// Get secret from environment
+const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET
+
+if (!secret) {
+  console.warn('[AUTH] WARNING: No AUTH_SECRET or NEXTAUTH_SECRET set. Using fallback for development only.')
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  secret,
+  secret: secret || 'development-secret-do-not-use-in-production',
   trustHost: true,
   session: { strategy: 'jwt' },
   pages: {
@@ -29,13 +32,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
       async authorize(credentials) {
         try {
+          console.log('[AUTH] Authorize called with email:', credentials?.email)
+          
           const parsed = credentialsSchema.safeParse(credentials)
           if (!parsed.success) {
-            console.log('[AUTH] Invalid credentials format')
+            console.log('[AUTH] Invalid credentials format:', parsed.error)
             return null
           }
 
           const { email, password } = parsed.data
+          console.log('[AUTH] Looking up user:', email)
 
           const user = await prisma.users.findUnique({
             where: { email },
@@ -51,6 +57,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return null
           }
 
+          console.log('[AUTH] User found, checking password')
           const isValid = await bcrypt.compare(password, user.password)
           if (!isValid) {
             console.log('[AUTH] Invalid password for:', email)
@@ -64,8 +71,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             name: user.name,
             role: user.role,
           }
-        } catch (error) {
-          console.error('[AUTH_ERROR]', error)
+        } catch (error: any) {
+          console.error('[AUTH_ERROR]', error.message, error.stack)
           return null
         }
       },
@@ -87,4 +94,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return session
     },
   },
+  events: {
+    async signIn(message) {
+      console.log('[AUTH_EVENT] signIn:', message)
+    },
+    async error(message) {
+      console.error('[AUTH_EVENT] error:', message)
+    },
+  },
+  debug: process.env.NODE_ENV === 'development',
 })
