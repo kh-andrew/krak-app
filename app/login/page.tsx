@@ -6,17 +6,29 @@ export default function LoginPage() {
   async function handleSubmit(formData: FormData) {
     'use server'
     
-    const result = await signIn('credentials', {
-      email: formData.get('email'),
-      password: formData.get('password'),
-      redirect: false,
-    })
-    
-    if (result?.error) {
-      redirect('/login?error=invalid')
+    try {
+      const email = formData.get('email') as string
+      const password = formData.get('password') as string
+      
+      console.log('[LOGIN_ATTEMPT]', { email: email?.slice(0, 3) + '***' })
+      
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      })
+      
+      console.log('[LOGIN_RESULT]', { error: result?.error, ok: result?.ok })
+      
+      if (result?.error) {
+        redirect('/login?error=invalid')
+      }
+      
+      redirect('/dashboard')
+    } catch (error: any) {
+      console.error('[LOGIN_ERROR]', error.message)
+      redirect('/login?error=server')
     }
-    
-    redirect('/dashboard')
   }
   
   return (
