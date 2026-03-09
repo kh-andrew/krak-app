@@ -13,7 +13,8 @@ const prismaClientSingleton = () => {
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
     datasources: {
       db: {
-        url: process.env.DATABASE_URL || SUPABASE_URL,
+        // Force Supabase connection - ignore Vercel env cache
+        url: SUPABASE_URL,
       },
     },
   })
