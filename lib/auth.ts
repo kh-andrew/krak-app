@@ -26,23 +26,33 @@ export const authOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
+          console.log('[AUTH] Missing credentials')
           return null
         }
 
         try {
+          console.log('[AUTH] Looking up user:', credentials.email)
           const user = await prisma.users.findUnique({
             where: { email: credentials.email },
           })
 
-          if (!user || !user.isActive) {
+          if (!user) {
+            console.log('[AUTH] User not found:', credentials.email)
+            return null
+          }
+          
+          if (!user.isActive) {
+            console.log('[AUTH] User inactive:', credentials.email)
             return null
           }
 
           const isValid = await bcrypt.compare(credentials.password, user.password)
           if (!isValid) {
+            console.log('[AUTH] Invalid password for:', credentials.email)
             return null
           }
 
+          console.log('[AUTH] Login successful:', credentials.email)
           return {
             id: user.id,
             email: user.email,
