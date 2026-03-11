@@ -26,7 +26,7 @@ export async function POST(
   
   // Handle assignment
   if (action === 'assign') {
-    const userId = formData.get('userId') as string
+    const userId = formData.get('userId') as string || formData.get('driverId') as string
     const driverEmail = formData.get('driverEmail') as string // For Telegram workflow
     
     const assignToId = userId || driverEmail
