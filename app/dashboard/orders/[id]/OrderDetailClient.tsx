@@ -128,11 +128,14 @@ export default function OrderDetailClient({ order, users }: OrderDetailClientPro
   const handleAssignDelivery = useCallback(async (userId: string) => {
     setIsAssigning(true);
     try {
-      const response = await fetch(`/api/orders/${order.id}/delivery/assign`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
-      });
+const formData = new FormData();
+formData.append('action', 'assign');
+formData.append('userId', userId);
+const response = await fetch(`/api/orders/${order.id}/delivery`, {
+  method: 'POST',
+  body: formData,
+});
+
       
       if (!response.ok) throw new Error('Failed to assign delivery');
       router.refresh();
