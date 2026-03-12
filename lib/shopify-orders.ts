@@ -1,263 +1,63 @@
-import { shopifyClient } from '@/lib/shopify'
-import { prisma } from '@/lib/prisma'
+import { shopifyRequest } from '@/lib/shopify-auth'
 import { OrderStatus } from '@prisma/client'
 
-interface ShopifyOrder {
-  id: string
-  name: string
-  email: string
-  totalPriceSet: {
-    shopMoney: {
-      amount: string
-      currencyCode: string
-    }
-  }
-  lineItems: {
-    edges: Array<{
-      node: {
-        title: string
-        quantity: number
-        originalUnitPriceSet: {
-          shopMoney: {
-            amount: string
-          }
-        }
-        sku: string | null
-      }
-    }>
-  }
-  customer?: {
-    id: string
-    email: string
-    firstName: string | null
-    lastName: string | null
-    phone: string | null
-    defaultAddress?: {
-      address1: string | null
-      city: string | null
-      zip: string | null
-      country: string | null
-    }
-  }
-  shippingAddress?: {
-    address1: string
-    city: string
-    zip: string
-    country: string
-  }
+const debug = (msg: string, data?: any) => console.log(`[Shopify] ${msg}`, data || '')
+
+export async function updateShopifyOrderStatus(shopifyOrderId: string, status: OrderStatus): Promise<boolean> {
+  const orderId = shopifyOrderId.split('/').pop()
+  if (!orderId) return false
+  
+  const result = await shopifyRequest(`orders/${orderId}.json`, {
+    method: 'PUT',
+    body: JSON.stringify({ order: { tags: `delivery:${status.toLowerCase()}` } })
+  })
+  
+  return !!result?.order
 }
 
-export async function fetchShopifyOrder(shopifyOrderId: string): Promise<ShopifyOrder | null> {
-  if (!shopifyClient) {
-    console.log('Shopify not configured, cannot fetch order')
-    return null
-  }
+export async function createFulfillment(shopifyOrderId: string, tracking?: { company: string; number: string }): Promise<boolean> {
+  const orderId = shopifyOrderId.split('/').pop()
+  if (!orderId) return false
 
-  const query = `
-    query getOrder($id: ID!) {
-      order(id: $id) {
-        id
-        name
-        email
-        totalPriceSet {
-          shopMoney {
-            amount
-            currencyCode
-          }
-        }
-        lineItems(first: 50) {
-          edges {
-            node {
-              title
-              quantity
-              originalUnitPriceSet {
-                shopMoney {
-                  amount
-                }
-              }
-              sku
-            }
-          }
-        }
-        customer {
-          id
-          email
-          firstName
-          lastName
-          phone
-          defaultAddress {
-            address1
-            city
-            zip
-            country
-          }
-        }
-        shippingAddress {
-          address1
-          city
-          zip
-          country
-        }
-      }
-    }
-  `
+  debug(`Creating fulfillment for order ${orderId}`)
 
-  try {
-    const response = await shopifyClient.request(query, {
-      variables: { id: shopifyOrderId },
-    }) as any
-
-    return response.data?.order ?? null
-  } catch (error) {
-    console.error('Error fetching Shopify order:', error)
-    return null
-  }
-}
-
-export async function updateShopifyOrderStatus(
-  shopifyOrderId: string, 
-  status: OrderStatus
-): Promise<boolean> {
-  if (!shopifyClient) {
-    console.log('Shopify not configured, skipping status update')
+  const foRes = await shopifyRequest(`orders/${orderId}/fulfillment_orders.json`)
+  const orders = foRes?.fulfillment_orders || []
+  
+  if (!orders.length) {
+    debug('No fulfillment orders found')
     return false
   }
 
-  const statusMap: Record<OrderStatus, string> = {
-    RECEIVED: 'PENDING',
-    PREPARING: 'PROCESSING',
-    OUT_FOR_DELIVERY: 'SHIPPED',
-    DELIVERED: 'FULFILLED',
-    FAILED: 'UNFULFILLED',
+  const fo = orders[0]
+  if (!fo.assigned_location_id) {
+    debug('No location ID')
+    return false
   }
 
-  const mutation = `
-    mutation orderUpdate($input: OrderInput!) {
-      orderUpdate(input: $input) {
-        order {
-          id
-          displayFulfillmentStatus
-        }
-        userErrors {
-          field
-          message
-        }
+  const result = await shopifyRequest('fulfillments.json', {
+    method: 'POST',
+    body: JSON.stringify({
+      fulfillment: {
+        location_id: fo.assigned_location_id,
+        notify_customer: true,
+        tracking_number: tracking?.number,
+        tracking_company: tracking?.company,
+        line_items_by_fulfillment_order: [{
+          fulfillment_order_id: fo.id,
+          fulfillment_order_line_items: fo.line_items
+            .filter((i: any) => i.fulfillable_quantity > 0)
+            .map((i: any) => ({ id: i.id, quantity: i.fulfillable_quantity }))
+        }]
       }
-    }
-  `
+    })
+  })
 
-  try {
-    const response = await shopifyClient.request(mutation, {
-      variables: {
-        input: {
-          id: shopifyOrderId,
-          tags: [`delivery:${status.toLowerCase()}`],
-        },
-      },
-    }) as any
-
-    const errors = response.data?.orderUpdate?.userErrors
-    if (errors?.length > 0) {
-      console.error('Shopify update errors:', errors)
-      return false
-    }
-
+  if (result?.fulfillment) {
+    debug('Fulfillment created:', result.fulfillment.id)
     return true
-  } catch (error) {
-    console.error('Error updating Shopify order:', error)
-    return false
   }
-}
-
-export async function createFulfillment(
-  shopifyOrderId: string,
-  trackingInfo?: { company: string; number: string }
-): Promise<boolean> {
-  if (!shopifyClient) {
-    console.log('Shopify not configured, skipping fulfillment creation')
-    return false
-  }
-
-  // Step 1: Get the fulfillment order ID and location
-  const fulfillmentOrderQuery = `
-    query getFulfillmentOrders($orderId: ID!) {
-      order(id: $orderId) {
-        fulfillmentOrders(first: 1) {
-          edges {
-            node {
-              id
-              assignedLocation {
-                location {
-                  id
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  `
-
-  try {
-    const foResponse = await shopifyClient.request(fulfillmentOrderQuery, {
-      variables: { orderId: shopifyOrderId },
-    }) as any
-
-    const fulfillmentOrder = foResponse.data?.order?.fulfillmentOrders?.edges?.[0]?.node
-    
-    if (!fulfillmentOrder) {
-      console.error('No fulfillment order found for:', shopifyOrderId)
-      return false
-    }
-
-    const fulfillmentOrderId = fulfillmentOrder.id
-    const locationId = fulfillmentOrder.assignedLocation?.location?.id
-
-    if (!locationId) {
-      console.error('No location ID found for fulfillment')
-      return false
-    }
-
-    // Step 2: Create the fulfillment with location
-    const mutation = `
-      mutation fulfillmentCreateV2($fulfillment: FulfillmentV2Input!) {
-        fulfillmentCreateV2(fulfillment: $fulfillment) {
-          fulfillment {
-            id
-            status
-          }
-          userErrors {
-            field
-            message
-          }
-        }
-      }
-    `
-
-    const response = await shopifyClient.request(mutation, {
-      variables: {
-        fulfillment: {
-          lineItemsByFulfillmentOrder: {
-            fulfillmentOrderId: fulfillmentOrderId,
-          },
-          trackingInfo: trackingInfo ? {
-            company: trackingInfo.company,
-            number: trackingInfo.number,
-          } : undefined,
-          notifyCustomer: true,
-        },
-      },
-    }) as any
-
-    const errors = response.data?.fulfillmentCreateV2?.userErrors
-    if (errors?.length > 0) {
-      console.error('Fulfillment creation errors:', errors)
-      return false
-    }
-
-    return true
-  } catch (error) {
-    console.error('Error creating fulfillment:', error)
-    return false
-  }
+  
+  debug('Failed to create fulfillment')
+  return false
 }
