@@ -26,7 +26,7 @@ export async function POST(
   
   // Handle assignment
   if (action === 'assign') {
-    const userId = formData.get('userId') as string || formData.get('driverId') as string
+    const userId = formData.get('userId') as string
     const driverEmail = formData.get('driverEmail') as string // For Telegram workflow
     
     const assignToId = userId || driverEmail
@@ -129,8 +129,14 @@ export async function POST(
       // First update the order status (adds tag)
       const statusUpdated = await updateShopifyOrderStatus(delivery.orders.shopifyId, 'DELIVERED')
       
-      // Then create fulfillment (actually marks as fulfilled)
-      const fulfillmentCreated = await createFulfillment(delivery.orders.shopifyId)
+      // Then create fulfillment with dummy tracking for local delivery
+      const fulfillmentCreated = await createFulfillment(
+        delivery.orders.shopifyId,
+        { 
+          company: 'Local Delivery',
+          number: `LOCAL-${Date.now()}`
+        }
+      )
       
       shopifySynced = statusUpdated && fulfillmentCreated
     } catch (error) {

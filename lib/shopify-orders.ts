@@ -178,33 +178,78 @@ export async function createFulfillment(
     return false
   }
 
-  const mutation = `
-    mutation fulfillmentCreate($input: FulfillmentInput!) {
-      fulfillmentCreate(input: $input) {
-        fulfillment {
-          id
-          status
-        }
-        userErrors {
-          field
-          message
+  // Step 1: Get the fulfillment order ID and location
+  const fulfillmentOrderQuery = `
+    query getFulfillmentOrders($orderId: ID!) {
+      order(id: $orderId) {
+        fulfillmentOrders(first: 1) {
+          edges {
+            node {
+              id
+              assignedLocation {
+                location {
+                  id
+                }
+              }
+            }
+          }
         }
       }
     }
   `
 
   try {
+    const foResponse = await shopifyClient.request(fulfillmentOrderQuery, {
+      variables: { orderId: shopifyOrderId },
+    }) as any
+
+    const fulfillmentOrder = foResponse.data?.order?.fulfillmentOrders?.edges?.[0]?.node
+    
+    if (!fulfillmentOrder) {
+      console.error('No fulfillment order found for:', shopifyOrderId)
+      return false
+    }
+
+    const fulfillmentOrderId = fulfillmentOrder.id
+    const locationId = fulfillmentOrder.assignedLocation?.location?.id
+
+    if (!locationId) {
+      console.error('No location ID found for fulfillment')
+      return false
+    }
+
+    // Step 2: Create the fulfillment with location
+    const mutation = `
+      mutation fulfillmentCreateV2($fulfillment: FulfillmentV2Input!) {
+        fulfillmentCreateV2(fulfillment: $fulfillment) {
+          fulfillment {
+            id
+            status
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `
+
     const response = await shopifyClient.request(mutation, {
       variables: {
-        input: {
-          orderId: shopifyOrderId,
-          trackingInfo: trackingInfo ? [trackingInfo] : [],
+        fulfillment: {
+          lineItemsByFulfillmentOrder: {
+            fulfillmentOrderId: fulfillmentOrderId,
+          },
+          trackingInfo: trackingInfo ? {
+            company: trackingInfo.company,
+            number: trackingInfo.number,
+          } : undefined,
           notifyCustomer: true,
         },
       },
     }) as any
 
-    const errors = response.data?.fulfillmentCreate?.userErrors
+    const errors = response.data?.fulfillmentCreateV2?.userErrors
     if (errors?.length > 0) {
       console.error('Fulfillment creation errors:', errors)
       return false
