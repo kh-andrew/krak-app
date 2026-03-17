@@ -1,6 +1,6 @@
 import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import bcrypt from 'bcryptjs'
+import { supabase } from '@/lib/supabase'
 import { prisma } from '@/lib/prisma'
 
 const secret = process.env.NEXTAUTH_SECRET
@@ -31,44 +31,57 @@ export const authOptions = {
         }
 
         try {
-          console.log('[AUTH] Looking up user:', credentials.email)
-          console.log('[AUTH] DB_URL set:', !!process.env.DATABASE_URL)
+          console.log('[AUTH] Authenticating via Supabase Auth:', credentials.email)
           
-          const user = await prisma.users.findUnique({
+          // Step 1: Authenticate with Supabase Auth
+          const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+            email: credentials.email,
+            password: credentials.password,
+          })
+
+          if (authError || !authData.user) {
+            console.log('[AUTH] Supabase Auth failed:', authError?.message)
+            return null
+          }
+
+          console.log('[AUTH] Supabase Auth successful:', authData.user.email)
+
+          // Step 2: Get or create user in Prisma database
+          let dbUser = await prisma.users.findUnique({
             where: { email: credentials.email },
           })
 
-          if (!user) {
-            console.log('[AUTH] User not found:', credentials.email)
-            return null
-          }
-          
-          console.log('[AUTH] User found:', user.email, 'isActive:', user.isActive)
-          
-          if (!user.isActive) {
-            console.log('[AUTH] User inactive:', credentials.email)
-            return null
+          if (!dbUser) {
+            console.log('[AUTH] Creating user in database:', credentials.email)
+            // Create user in database if doesn't exist
+            dbUser = await prisma.users.create({
+              data: {
+                id: authData.user.id,
+                email: credentials.email,
+                name: authData.user.user_metadata?.name || credentials.email.split('@')[0],
+                role: 'ADMIN', // Default role
+                password: 'supabase-managed', // Password is managed by Supabase
+                isActive: true,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+            })
           }
 
-          console.log('[AUTH] Comparing password...')
-          const isValid = await bcrypt.compare(credentials.password, user.password)
-          console.log('[AUTH] Password valid:', isValid)
-          
-          if (!isValid) {
-            console.log('[AUTH] Invalid password for:', credentials.email)
+          if (!dbUser.isActive) {
+            console.log('[AUTH] User inactive:', credentials.email)
             return null
           }
 
           console.log('[AUTH] Login successful:', credentials.email)
           return {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            role: user.role,
+            id: dbUser.id,
+            email: dbUser.email,
+            name: dbUser.name,
+            role: dbUser.role,
           }
         } catch (error) {
           console.error('[AUTH_ERROR]', error)
-          console.error('[AUTH_ERROR_STACK]', (error as Error).stack)
           return null
         }
       },
@@ -94,4 +107,3 @@ export const authOptions = {
 }
 
 export default NextAuth(authOptions)
-// Deployment trigger: Mon Mar  9 09:43:54 AM CST 2026
