@@ -1,6 +1,6 @@
 import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import { supabase } from '@/lib/supabase'
+import { getSupabaseClient } from '@/lib/supabase'
 
 const secret = process.env.NEXTAUTH_SECRET
 
@@ -33,6 +33,7 @@ export const authOptions = {
           console.log('[AUTH] Authenticating via Supabase Auth:', credentials.email)
           
           // Authenticate with Supabase Auth only (skip Prisma for now due to connection issues)
+          const supabase = getSupabaseClient()
           const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
             email: credentials.email,
             password: credentials.password,

@@ -1,34 +1,66 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+// Client for browser (anon key) - lazy initialization
+let clientInstance: ReturnType<typeof createClient> | null = null
 
-if (!supabaseUrl) {
-  throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL')
+export function getSupabaseClient() {
+  if (!clientInstance) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('Missing Supabase environment variables')
+    }
+    
+    clientInstance = createClient(supabaseUrl, supabaseAnonKey)
+  }
+  return clientInstance
 }
 
-// Client for browser (anon key)
-export const supabaseClient = createClient(
-  supabaseUrl,
-  supabaseAnonKey || ''
-)
-
-// Admin client for server-side operations (service role key)
-export const supabaseAdmin = createClient(
-  supabaseUrl,
-  supabaseServiceKey || supabaseAnonKey || '',
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
+// For compatibility with existing code
+export const supabaseClient = {
+  get auth() {
+    return getSupabaseClient().auth
   }
-)
+}
 
-// Type-safe database helper
+// Admin client for server-side operations - lazy initialization
+let adminInstance: ReturnType<typeof createClient> | null = null
+
+export function getSupabaseAdmin() {
+  if (!adminInstance) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    if (!supabaseUrl) {
+      throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL')
+    }
+    
+    adminInstance = createClient(
+      supabaseUrl,
+      supabaseServiceKey || supabaseAnonKey || '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
+  }
+  return adminInstance
+}
+
+// For compatibility
+export const supabaseAdmin = {
+  from(table: string) {
+    return getSupabaseAdmin().from(table)
+  }
+}
+
+// Type-safe database helpers
 export async function dbQuery(table: string, query: any = {}) {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getSupabaseAdmin()
     .from(table)
     .select(query.select || '*')
     
@@ -41,7 +73,7 @@ export async function dbQuery(table: string, query: any = {}) {
 }
 
 export async function dbInsert(table: string, data: any) {
-  const { data: result, error } = await supabaseAdmin
+  const { data: result, error } = await getSupabaseAdmin()
     .from(table)
     .insert(data)
     .select()
@@ -56,7 +88,7 @@ export async function dbInsert(table: string, data: any) {
 }
 
 export async function dbUpdate(table: string, id: string, data: any) {
-  const { data: result, error } = await supabaseAdmin
+  const { data: result, error } = await getSupabaseAdmin()
     .from(table)
     .update(data)
     .eq('id', id)
@@ -72,7 +104,7 @@ export async function dbUpdate(table: string, id: string, data: any) {
 }
 
 export async function dbDelete(table: string, id: string) {
-  const { error } = await supabaseAdmin
+  const { error } = await getSupabaseAdmin()
     .from(table)
     .delete()
     .eq('id', id)

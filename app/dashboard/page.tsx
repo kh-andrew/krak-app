@@ -1,5 +1,5 @@
 import { requireAuth } from '@/lib/auth-helpers'
-import { supabaseAdmin } from '@/lib/supabase'
+import { getSupabaseAdmin } from '@/lib/supabase'
 import Link from 'next/link'
 import { ORDER_STATUS_FLOW, OrderStatusKey } from '@/lib/constants'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -22,7 +22,8 @@ export default async function DashboardPage({
   const { search, status } = params
   
   // Fetch orders from Supabase
-  let query = supabaseAdmin
+  const supabase = getSupabaseAdmin()
+  let query = supabase
     .from('orders')
     .select(`
       *,
