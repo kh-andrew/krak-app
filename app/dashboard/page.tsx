@@ -1,10 +1,9 @@
-import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-helpers'
+import { supabaseAdmin } from '@/lib/supabase'
 import Link from 'next/link'
 import { ORDER_STATUS_FLOW, OrderStatusKey } from '@/lib/constants'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { OrderSearch } from './components/OrderSearch'
-import { OrderFilters } from './components/OrderFilters'
 
 export default async function DashboardPage({ 
   searchParams 
@@ -20,61 +19,45 @@ export default async function DashboardPage({
   await requireAuth()
   
   const params = await searchParams
-  const { search, status, dateFrom, dateTo, country } = params
+  const { search, status } = params
   
-  const where: any = {}
+  // Fetch orders from Supabase
+  let query = supabaseAdmin
+    .from('orders')
+    .select(`
+      *,
+      customers (*),
+      deliveries (*, users(name))
+    `)
+    .order('createdAt', { ascending: false })
+    .limit(100)
   
-  if (status && status !== 'ALL') where.status = status
-  
-  if (dateFrom || dateTo) {
-    where.createdAt = {}
-    if (dateFrom) where.createdAt.gte = new Date(dateFrom)
-    if (dateTo) where.createdAt.lte = new Date(dateTo)
+  if (status && status !== 'ALL') {
+    query = query.eq('status', status)
   }
   
-  if (search) {
-    where.OR = [
-      { shopifyOrderNumber: { contains: search, mode: 'insensitive' } },
-      { customer: { OR: [
-        { firstName: { contains: search, mode: 'insensitive' } },
-        { lastName: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-      ]}}
-    ]
+  const { data: orders, error } = await query
+  
+  if (error) {
+    console.error('[DASHBOARD_ERROR]', error)
+    return (
+      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-xl text-white mb-2">Error loading orders</h1>
+          <p className="text-gray-400">{error.message}</p>
+        </div>
+      </div>
+    )
   }
   
-  if (country && country !== 'ALL') where.customer = { country }
-  
-  const orders = await prisma.orders.findMany({
-    where,
-    include: {
-      customers: { select: { firstName: true, lastName: true, email: true, phone: true, country: true } },
-      deliveries: { include: { users: { select: { name: true } } } },
-      _count: { select: { activity_logs: true } }
-    },
-    orderBy: { createdAt: 'desc' },
-    take: 100,
-  })
-  
-  const today = new Date(); today.setHours(0,0,0,0)
-  const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7)
-  
-  // Parallel count queries - optimized
-  const [totalOrders, todayOrders, weekOrders, pendingOrders] = await Promise.all([
-    prisma.orders.count(),
-    prisma.orders.count({ where: { createdAt: { gte: today } } }),
-    prisma.orders.count({ where: { createdAt: { gte: weekAgo } } }),
-    prisma.orders.count({ where: { status: { in: ['RECEIVED', 'PREPARING', 'OUT_FOR_DELIVERY'] } } }),
-  ])
-  
-  // Calculate stats from the orders we already fetched
+  // Calculate stats
   const stats = {
-    total: orders.length,
-    received: orders.filter(o => o.status === 'RECEIVED').length,
-    preparing: orders.filter(o => o.status === 'PREPARING').length,
-    outForDelivery: orders.filter(o => o.status === 'OUT_FOR_DELIVERY').length,
-    delivered: orders.filter(o => o.status === 'DELIVERED').length,
-    failed: orders.filter(o => o.status === 'FAILED').length,
+    total: orders?.length || 0,
+    received: orders?.filter((o: any) => o.status === 'RECEIVED').length || 0,
+    preparing: orders?.filter((o: any) => o.status === 'PREPARING').length || 0,
+    outForDelivery: orders?.filter((o: any) => o.status === 'OUT_FOR_DELIVERY').length || 0,
+    delivered: orders?.filter((o: any) => o.status === 'DELIVERED').length || 0,
+    failed: orders?.filter((o: any) => o.status === 'FAILED').length || 0,
   }
   
   return (
@@ -96,21 +79,21 @@ export default async function DashboardPage({
       </div>
 
       <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
-        {/* Stats - Mobile: 3 columns, Tablet+: 6 columns */}
+        {/* Stats */}
         <div className="grid grid-cols-3 md:grid-cols-6 gap-2 md:gap-4">
           <div className="bg-[#141414] p-3 md:p-4 rounded-lg md:rounded-xl border border-[#2A2A2A] text-center md:text-left">
-            <p className="text-xs text-gray-400">Today</p>
-            <p className="text-xl md:text-2xl font-bold text-white">{todayOrders}</p>
+            <p className="text-xs text-gray-400">Total</p>
+            <p className="text-xl md:text-2xl font-bold text-white">{stats.total}</p>
           </div>
           
           <div className="bg-[#141414] p-3 md:p-4 rounded-lg md:rounded-xl border border-[#2A2A2A] text-center md:text-left">
             <p className="text-xs text-gray-400">Pending</p>
-            <p className="text-xl md:text-2xl font-bold text-[#F59E0B]">{pendingOrders}</p>
+            <p className="text-xl md:text-2xl font-bold text-[#F59E0B]">{stats.received + stats.preparing + stats.outForDelivery}</p>
           </div>
           
           <div className="bg-[#141414] p-3 md:p-4 rounded-lg md:rounded-xl border border-[#2A2A2A] text-center md:text-left">
-            <p className="text-xs text-gray-400">Total</p>
-            <p className="text-xl md:text-2xl font-bold text-white">{totalOrders}</p>
+            <p className="text-xs text-gray-400">Delivered</p>
+            <p className="text-xl md:text-2xl font-bold text-[#22C55E]">{stats.delivered}</p>
           </div>
           
           <div className="hidden md:block bg-[#141414] p-4 rounded-xl border border-[#2A2A2A]">
@@ -124,32 +107,8 @@ export default async function DashboardPage({
           </div>
           
           <div className="hidden md:block bg-[#141414] p-4 rounded-xl border border-[#2A2A2A]">
-            <p className="text-sm text-gray-400">Delivered</p>
-            <p className="text-2xl font-bold text-[#22C55E]">{stats.delivered}</p>
-          </div>
-        </div>
-
-        {/* Mobile Status Scroll */}
-        <div className="flex md:hidden gap-2 overflow-x-auto pb-2 -mx-4 px-4">
-          <div className="flex-shrink-0 bg-[#141414] px-4 py-2 rounded-lg border border-[#2A2A2A]">
-            <span className="text-xs text-gray-400">Recv: </span>
-            <span className="text-sm font-bold text-[#3B82F6]">{stats.received}</span>
-          </div>
-          <div className="flex-shrink-0 bg-[#141414] px-4 py-2 rounded-lg border border-[#2A2A2A]">
-            <span className="text-xs text-gray-400">Prep: </span>
-            <span className="text-sm font-bold text-[#EAB308]">{stats.preparing}</span>
-          </div>
-          <div className="flex-shrink-0 bg-[#141414] px-4 py-2 rounded-lg border border-[#2A2A2A]">
-            <span className="text-xs text-gray-400">Out: </span>
-            <span className="text-sm font-bold text-[#A855F7]">{stats.outForDelivery}</span>
-          </div>
-          <div className="flex-shrink-0 bg-[#141414] px-4 py-2 rounded-lg border border-[#2A2A2A]">
-            <span className="text-xs text-gray-400">Done: </span>
-            <span className="text-sm font-bold text-[#22C55E]">{stats.delivered}</span>
-          </div>
-          <div className="flex-shrink-0 bg-[#141414] px-4 py-2 rounded-lg border border-[#2A2A2A]">
-            <span className="text-xs text-gray-400">Fail: </span>
-            <span className="text-sm font-bold text-[#EF4444]">{stats.failed}</span>
+            <p className="text-sm text-gray-400">Failed</p>
+            <p className="text-2xl font-bold text-[#EF4444]">{stats.failed}</p>
           </div>
         </div>
 
@@ -158,11 +117,9 @@ export default async function DashboardPage({
           <OrderSearch defaultValue={search} />
         </div>
 
-        {/* Orders - Mobile: Cards, Tablet+: Table */}
-        
-        {/* Mobile Card View */}
+        {/* Orders */}
         <div className="md:hidden space-y-3">
-          {orders.map((order) => {
+          {orders?.map((order: any) => {
             const statusConfig = ORDER_STATUS_FLOW[order.status as OrderStatusKey]
             
             return (
@@ -190,12 +147,6 @@ export default async function DashboardPage({
                       <span>{formatCurrency(Number(order.totalAmount), order.currency)}</span>
                       <span>•</span>
                       <span>{formatDate(order.createdAt)}</span>
-                      {order._count.activity_logs > 0 && (
-                        <>
-                          <span>•</span>
-                          <span className="text-blue-400">{order._count.activity_logs} updates</span>
-                        </>
-                      )}
                     </div>
                   </div>
                   
@@ -208,7 +159,7 @@ export default async function DashboardPage({
           })}
         </div>
 
-        {/* Tablet/Desktop Table View */}
+        {/* Desktop Table */}
         <div className="hidden md:block bg-[#141414] rounded-xl border border-[#2A2A2A] overflow-hidden">
           <table className="w-full">
             <thead className="bg-[#1A1A1A]">
@@ -217,13 +168,12 @@ export default async function DashboardPage({
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Customer</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Amount</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Assigned</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Date</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#2A2A2A]">
-              {orders.map((order) => {
+              {orders?.map((order: any) => {
                 const statusConfig = ORDER_STATUS_FLOW[order.status as OrderStatusKey]
                 
                 return (
@@ -241,7 +191,6 @@ export default async function DashboardPage({
                         {statusConfig?.label || order.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-white">{order.deliveries?.users?.name || '—'}</td>
                     <td className="px-6 py-4 text-gray-400">{formatDate(order.createdAt)}</td>
                     <td className="px-6 py-4 text-right">
                       <Link
@@ -258,8 +207,11 @@ export default async function DashboardPage({
           </table>
         </div>
 
-        {orders.length === 0 && (
-          <div className="text-center py-12 text-gray-400">No orders found</div>
+        {(!orders || orders.length === 0) && (
+          <div className="text-center py-12 text-gray-400">
+            <p className="text-lg mb-2">No orders found</p>
+            <p className="text-sm">Orders will appear here when they come in from Shopify</p>
+          </div>
         )}
       </div>
     </div>
