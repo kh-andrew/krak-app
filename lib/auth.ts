@@ -32,6 +32,8 @@ export const authOptions = {
 
         try {
           console.log('[AUTH] Looking up user:', credentials.email)
+          console.log('[AUTH] DB_URL set:', !!process.env.DATABASE_URL)
+          
           const user = await prisma.users.findUnique({
             where: { email: credentials.email },
           })
@@ -41,12 +43,17 @@ export const authOptions = {
             return null
           }
           
+          console.log('[AUTH] User found:', user.email, 'isActive:', user.isActive)
+          
           if (!user.isActive) {
             console.log('[AUTH] User inactive:', credentials.email)
             return null
           }
 
+          console.log('[AUTH] Comparing password...')
           const isValid = await bcrypt.compare(credentials.password, user.password)
+          console.log('[AUTH] Password valid:', isValid)
+          
           if (!isValid) {
             console.log('[AUTH] Invalid password for:', credentials.email)
             return null
@@ -61,6 +68,7 @@ export const authOptions = {
           }
         } catch (error) {
           console.error('[AUTH_ERROR]', error)
+          console.error('[AUTH_ERROR_STACK]', (error as Error).stack)
           return null
         }
       },
