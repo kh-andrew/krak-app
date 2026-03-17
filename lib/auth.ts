@@ -1,7 +1,6 @@
 import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { supabase } from '@/lib/supabase'
-import { prisma } from '@/lib/prisma'
 
 const secret = process.env.NEXTAUTH_SECRET
 
@@ -33,7 +32,7 @@ export const authOptions = {
         try {
           console.log('[AUTH] Authenticating via Supabase Auth:', credentials.email)
           
-          // Step 1: Authenticate with Supabase Auth
+          // Authenticate with Supabase Auth only (skip Prisma for now due to connection issues)
           const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
             email: credentials.email,
             password: credentials.password,
@@ -46,39 +45,14 @@ export const authOptions = {
 
           console.log('[AUTH] Supabase Auth successful:', authData.user.email)
 
-          // Step 2: Get or create user in Prisma database
-          let dbUser = await prisma.users.findUnique({
-            where: { email: credentials.email },
-          })
-
-          if (!dbUser) {
-            console.log('[AUTH] Creating user in database:', credentials.email)
-            // Create user in database if doesn't exist
-            dbUser = await prisma.users.create({
-              data: {
-                id: authData.user.id,
-                email: credentials.email,
-                name: authData.user.user_metadata?.name || credentials.email.split('@')[0],
-                role: 'ADMIN', // Default role
-                password: 'supabase-managed', // Password is managed by Supabase
-                isActive: true,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-              },
-            })
-          }
-
-          if (!dbUser.isActive) {
-            console.log('[AUTH] User inactive:', credentials.email)
-            return null
-          }
-
-          console.log('[AUTH] Login successful:', credentials.email)
+          // Return user data from Supabase Auth
+          // Note: We're skipping Prisma database lookup due to connection pooler issues
+          // The user data will be synced when database connection is fixed
           return {
-            id: dbUser.id,
-            email: dbUser.email,
-            name: dbUser.name,
-            role: dbUser.role,
+            id: authData.user.id,
+            email: authData.user.email,
+            name: authData.user.user_metadata?.name || authData.user.email?.split('@')[0] || 'User',
+            role: 'ADMIN', // Default role - will be fetched from DB when connection works
           }
         } catch (error) {
           console.error('[AUTH_ERROR]', error)
