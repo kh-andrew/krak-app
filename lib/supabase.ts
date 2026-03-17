@@ -59,7 +59,7 @@ export const supabaseAdmin = {
 }
 
 // Type-safe database helpers
-export async function dbQuery(table: string, query: any = {}) {
+export async function dbQuery(table: string, query: Record<string, any> = {}) {
   const { data, error } = await getSupabaseAdmin()
     .from(table)
     .select(query.select || '*')
@@ -72,10 +72,10 @@ export async function dbQuery(table: string, query: any = {}) {
   return data
 }
 
-export async function dbInsert(table: string, data: any) {
+export async function dbInsert(table: string, data: Record<string, any>) {
   const { data: result, error } = await getSupabaseAdmin()
     .from(table)
-    .insert(data)
+    .insert(data as any)
     .select()
     .single()
     
@@ -87,10 +87,10 @@ export async function dbInsert(table: string, data: any) {
   return result
 }
 
-export async function dbUpdate(table: string, id: string, data: any) {
+export async function dbUpdate(table: string, id: string, data: Record<string, any>) {
   const { data: result, error } = await getSupabaseAdmin()
     .from(table)
-    .update(data)
+    .update(data as any)
     .eq('id', id)
     .select()
     .single()
