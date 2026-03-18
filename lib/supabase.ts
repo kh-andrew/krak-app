@@ -51,68 +51,9 @@ export function getSupabaseAdmin() {
   return adminInstance
 }
 
-// For compatibility
+// For compatibility - direct access to admin client
 export const supabaseAdmin = {
   from(table: string) {
     return getSupabaseAdmin().from(table)
   }
-}
-
-// Type-safe database helpers
-export async function dbQuery(table: string, query: Record<string, any> = {}) {
-  const { data, error } = await getSupabaseAdmin()
-    .from(table)
-    .select(query.select || '*')
-    
-  if (error) {
-    console.error(`[DB_ERROR] ${table}:`, error)
-    throw error
-  }
-  
-  return data
-}
-
-export async function dbInsert(table: string, data: Record<string, any>) {
-  const { data: result, error } = await getSupabaseAdmin()
-    .from(table)
-    .insert(data as any)
-    .select()
-    .single()
-    
-  if (error) {
-    console.error(`[DB_INSERT_ERROR] ${table}:`, error)
-    throw error
-  }
-  
-  return result
-}
-
-export async function dbUpdate(table: string, id: string, data: Record<string, any>) {
-  const { data: result, error } = await getSupabaseAdmin()
-    .from(table)
-    .update(data as any)
-    .eq('id', id)
-    .select()
-    .single()
-    
-  if (error) {
-    console.error(`[DB_UPDATE_ERROR] ${table}:`, error)
-    throw error
-  }
-  
-  return result
-}
-
-export async function dbDelete(table: string, id: string) {
-  const { error } = await getSupabaseAdmin()
-    .from(table)
-    .delete()
-    .eq('id', id)
-    
-  if (error) {
-    console.error(`[DB_DELETE_ERROR] ${table}:`, error)
-    throw error
-  }
-  
-  return true
 }
