@@ -18,11 +18,12 @@ export async function GET() {
       users: count || 0,
       timestamp: new Date().toISOString(),
     })
-  } catch (error) {
+  } catch (error: any) {
+    console.error('[HEALTH_CHECK_ERROR]', error)
     return NextResponse.json({
       status: 'unhealthy',
       database: 'disconnected',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error?.message || error?.toString() || 'Unknown error',
       timestamp: new Date().toISOString(),
     }, { status: 500 })
   }
