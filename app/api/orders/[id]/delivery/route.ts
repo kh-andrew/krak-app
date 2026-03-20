@@ -95,18 +95,17 @@ export async function POST(
     let signatureUrl: string | null = null
     let photoUrl: string | null = null
     
-    // Upload signature if provided (don't fail if upload fails)
+    // Upload signature if provided
     if (signatureDataUrl) {
       try {
         const signatureResult = await uploadSignature(signatureDataUrl, id)
         signatureUrl = signatureResult?.url || null
       } catch (uploadError) {
         console.error('[SIGNATURE_UPLOAD_ERROR]', uploadError)
-        // Continue without signature - don't fail the delivery
       }
     }
     
-    // Upload photo if provided (don't fail if upload fails)
+    // Upload photo if provided
     const photoBase64 = formData.get('photoBase64') as string | null
     if (photoBase64) {
       try {
@@ -115,7 +114,6 @@ export async function POST(
         photoUrl = photoResult?.url || null
       } catch (uploadError) {
         console.error('[PHOTO_UPLOAD_ERROR]', uploadError)
-        // Continue without photo - don't fail the delivery
       }
     } else if (photo && photo.size > 0) {
       try {
@@ -125,8 +123,15 @@ export async function POST(
         photoUrl = photoResult?.url || null
       } catch (uploadError) {
         console.error('[PHOTO_UPLOAD_ERROR]', uploadError)
-        // Continue without photo - don't fail the delivery
       }
+    }
+    
+    // Validate: require either signature or photo
+    if (!signatureUrl && !photoUrl) {
+      return NextResponse.json(
+        { error: 'Signature or photo is required to complete delivery' },
+        { status: 400 }
+      )
     }
     
     const oldStatus = delivery.orders.status
