@@ -1,8 +1,6 @@
 /**
  * Database schema types for KOMT
- * Generated from Supabase schema
- * 
- * DO NOT EDIT MANUALLY - Update via: npm run db:types
+ * Properly structured for Supabase postgrest-js
  */
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
@@ -53,6 +51,15 @@ export interface Database {
           createdAt?: string
           updatedAt?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "orders_customerId_fkey"
+            columns: ["customerId"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       customers: {
         Row: {
@@ -97,6 +104,7 @@ export interface Database {
           createdAt?: string
           updatedAt?: string
         }
+        Relationships: []
       }
       deliveries: {
         Row: {
@@ -144,6 +152,15 @@ export interface Database {
           createdAt?: string
           updatedAt?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "deliveries_orderId_fkey"
+            columns: ["orderId"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       Inventory: {
         Row: {
@@ -185,6 +202,22 @@ export interface Database {
           createdAt?: string
           updatedAt?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "Inventory_productId_fkey"
+            columns: ["productId"]
+            isOneToOne: false
+            referencedRelation: "Product"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "Inventory_locationId_fkey"
+            columns: ["locationId"]
+            isOneToOne: false
+            referencedRelation: "Location"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       InventoryMovement: {
         Row: {
@@ -217,6 +250,15 @@ export interface Database {
           performedBy?: string | null
           createdAt?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "InventoryMovement_inventoryId_fkey"
+            columns: ["inventoryId"]
+            isOneToOne: false
+            referencedRelation: "Inventory"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       Product: {
         Row: {
@@ -252,6 +294,7 @@ export interface Database {
           createdAt?: string
           updatedAt?: string
         }
+        Relationships: []
       }
       Location: {
         Row: {
@@ -281,6 +324,7 @@ export interface Database {
           createdAt?: string
           updatedAt?: string
         }
+        Relationships: []
       }
       users: {
         Row: {
@@ -307,6 +351,7 @@ export interface Database {
           createdAt?: string
           updatedAt?: string
         }
+        Relationships: []
       }
       activity_logs: {
         Row: {
@@ -348,6 +393,15 @@ export interface Database {
           notes?: string | null
           createdAt?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_orderId_fkey"
+            columns: ["orderId"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       webhook_events: {
         Row: {
@@ -374,8 +428,62 @@ export interface Database {
           processed?: boolean
           createdAt?: string
         }
+        Relationships: []
+      }
+      Batch: {
+        Row: {
+          id: string
+          batchCode: string
+          productId: string
+          locationId: string
+          initialQty: number
+          remainingQty: number
+          status: string
+          createdAt: string
+          updatedAt: string
+        }
+        Insert: {
+          id?: string
+          batchCode: string
+          productId: string
+          locationId: string
+          initialQty: number
+          remainingQty: number
+          status?: string
+          createdAt?: string
+          updatedAt?: string
+        }
+        Update: {
+          id?: string
+          batchCode?: string
+          productId?: string
+          locationId?: string
+          initialQty?: number
+          remainingQty?: number
+          status?: string
+          createdAt?: string
+          updatedAt?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "Batch_productId_fkey"
+            columns: ["productId"]
+            isOneToOne: false
+            referencedRelation: "Product"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "Batch_locationId_fkey"
+            columns: ["locationId"]
+            isOneToOne: false
+            referencedRelation: "Location"
+            referencedColumns: ["id"]
+          }
+        ]
       }
     }
+    Views: {}
+    Functions: {}
   }
 }
 

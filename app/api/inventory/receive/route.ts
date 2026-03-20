@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { getSupabaseUntyped } from '@/lib/supabase-untyped'
+import { getSupabaseAdmin } from '@/lib/supabase'
 
 // POST /api/inventory/receive
 // Full bundle expansion: KFSB → KFSP → KFSS
 export async function POST(req: Request) {
-  const supabase = getSupabaseUntyped()
+  const supabase = getSupabaseAdmin()
   
   try {
     const body = await req.json()

@@ -25,7 +25,7 @@ export async function GET(
     .select(`
       *,
       customers(*),
-      deliveries(*, users(id, name, email)),
+      deliveries!inner(*, users(id, name, email)),
       activity_logs(*, users(name, email))
     `)
     .eq('id', id)
@@ -129,14 +129,16 @@ export async function PATCH(
   }
   
   // If delivered, update delivery and sync to HubSpot
-  if (status === 'DELIVERED' && order.deliveries) {
+  // Note: deliveries is typed as array but business logic ensures only one per order
+  const delivery = Array.isArray(order.deliveries) ? order.deliveries[0] : order.deliveries
+  if (status === 'DELIVERED' && delivery) {
     await supabase
       .from('deliveries')
       .update({ deliveredAt: new Date().toISOString() })
-      .eq('id', order.deliveries.id)
+      .eq('id', delivery.id)
     
     // Async HubSpot sync (don't block response)
-    syncDeliveryToHubSpot(order.deliveries.id).catch(console.error)
+    syncDeliveryToHubSpot(delivery.id).catch(console.error)
   }
   
   return NextResponse.json(updatedOrder)

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSupabaseUntyped } from '@/lib/supabase-untyped'
+import { getSupabaseAdmin } from '@/lib/supabase'
 import { requireAuth } from '@/lib/auth-helpers'
 import { uploadSignature, uploadDeliveryPhoto } from '@/lib/storage'
 import { updateShopifyOrderStatus, createFulfillment } from '@/lib/shopify-orders'
@@ -11,7 +11,7 @@ export async function POST(
 ) {
   const session = await requireAuth()
   const { id } = await params
-  const supabase = getSupabaseUntyped()
+  const supabase = getSupabaseAdmin()
   
   const formData = await req.formData()
   const action = formData.get('action') as string

@@ -34,7 +34,7 @@ export default async function DashboardPage({
     .limit(100)
   
   if (status && status !== 'ALL') {
-    query = query.eq('status', status)
+    query = query.eq('status', status as 'RECEIVED' | 'PREPARING' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED')
   }
   
   const { data: orders, error } = await query
