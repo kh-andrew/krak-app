@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
+import { Database } from '@/types/database'
 
 // Client for browser (anon key) - lazy initialization
-let clientInstance: ReturnType<typeof createClient> | null = null
+let clientInstance: ReturnType<typeof createClient<Database>> | null = null
 
 export function getSupabaseClient() {
   if (!clientInstance) {
@@ -12,7 +13,7 @@ export function getSupabaseClient() {
       throw new Error('Missing Supabase environment variables')
     }
     
-    clientInstance = createClient(supabaseUrl, supabaseAnonKey)
+    clientInstance = createClient<Database>(supabaseUrl, supabaseAnonKey)
   }
   return clientInstance
 }
@@ -25,7 +26,7 @@ export const supabaseClient = {
 }
 
 // Admin client for server-side operations - lazy initialization
-let adminInstance: ReturnType<typeof createClient> | null = null
+let adminInstance: ReturnType<typeof createClient<Database>> | null = null
 
 export function getSupabaseAdmin() {
   if (!adminInstance) {
@@ -37,7 +38,7 @@ export function getSupabaseAdmin() {
       throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL')
     }
     
-    adminInstance = createClient(
+    adminInstance = createClient<Database>(
       supabaseUrl,
       supabaseServiceKey || supabaseAnonKey || '',
       {
@@ -53,7 +54,7 @@ export function getSupabaseAdmin() {
 
 // For compatibility - direct access to admin client
 export const supabaseAdmin = {
-  from(table: string) {
+  from<T extends keyof Database['public']['Tables']>(table: T) {
     return getSupabaseAdmin().from(table)
   }
 }
