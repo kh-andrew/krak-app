@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase'
 import { requireAuth } from '@/lib/auth-helpers'
-import { updateShopifyOrderStatus } from '@/lib/shopify-orders'
+import { updateShopifyOrderStatus, createFulfillment } from '@/lib/shopify-orders'
 import { syncDeliveryToHubSpot } from '@/lib/hubspot-sync'
 import { z } from 'zod'
 
@@ -94,7 +94,19 @@ export async function PATCH(
   let shopifySynced = false
   if (order.shopifyId) {
     try {
-      shopifySynced = await updateShopifyOrderStatus(order.shopifyId, status)
+      // Update status tag
+      const statusUpdated = await updateShopifyOrderStatus(order.shopifyId, status)
+      
+      // If marked as DELIVERED, also create fulfillment
+      let fulfillmentCreated = true
+      if (status === 'DELIVERED') {
+        fulfillmentCreated = await createFulfillment(
+          order.shopifyId,
+          { company: 'Local Delivery', number: `LOCAL-${Date.now()}` }
+        )
+      }
+      
+      shopifySynced = statusUpdated && fulfillmentCreated
     } catch (error) {
       console.error('[SHOPIFY_SYNC_ERROR]', error)
     }
