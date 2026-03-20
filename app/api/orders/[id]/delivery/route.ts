@@ -100,8 +100,18 @@ export async function POST(
       try {
         const signatureResult = await uploadSignature(signatureDataUrl, id)
         signatureUrl = signatureResult?.url || null
-      } catch (uploadError) {
+        if (!signatureUrl) {
+          return NextResponse.json(
+            { error: 'Signature upload failed - no URL returned' },
+            { status: 500 }
+          )
+        }
+      } catch (uploadError: any) {
         console.error('[SIGNATURE_UPLOAD_ERROR]', uploadError)
+        return NextResponse.json(
+          { error: `Signature upload failed: ${uploadError.message || 'Unknown error'}` },
+          { status: 500 }
+        )
       }
     }
     
@@ -112,8 +122,18 @@ export async function POST(
         const buffer = Buffer.from(photoBase64, 'base64')
         const photoResult = await uploadDeliveryPhoto(buffer, id)
         photoUrl = photoResult?.url || null
-      } catch (uploadError) {
+        if (!photoUrl) {
+          return NextResponse.json(
+            { error: 'Photo upload failed - no URL returned' },
+            { status: 500 }
+          )
+        }
+      } catch (uploadError: any) {
         console.error('[PHOTO_UPLOAD_ERROR]', uploadError)
+        return NextResponse.json(
+          { error: `Photo upload failed: ${uploadError.message || 'Unknown error'}` },
+          { status: 500 }
+        )
       }
     } else if (photo && photo.size > 0) {
       try {
@@ -121,15 +141,25 @@ export async function POST(
         const buffer = Buffer.from(bytes)
         const photoResult = await uploadDeliveryPhoto(buffer, id)
         photoUrl = photoResult?.url || null
-      } catch (uploadError) {
+        if (!photoUrl) {
+          return NextResponse.json(
+            { error: 'Photo upload failed - no URL returned' },
+            { status: 500 }
+          )
+        }
+      } catch (uploadError: any) {
         console.error('[PHOTO_UPLOAD_ERROR]', uploadError)
+        return NextResponse.json(
+          { error: `Photo upload failed: ${uploadError.message || 'Unknown error'}` },
+          { status: 500 }
+        )
       }
     }
     
     // Validate: require either signature or photo
     if (!signatureUrl && !photoUrl) {
       return NextResponse.json(
-        { error: 'Signature or photo is required to complete delivery' },
+        { error: 'Signature or photo is required to complete delivery. Upload may have failed.' },
         { status: 400 }
       )
     }
