@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma'
+import { getSupabaseAdmin } from '@/lib/supabase'
 import { requireAuth } from '@/lib/auth-helpers'
 import { notFound } from 'next/navigation'
 import OrderDetailClient from './OrderDetailClient'
@@ -10,42 +10,34 @@ export default async function OrderDetailPage({
 }) {
   await requireAuth()
   const { id } = await params
+  const supabase = getSupabaseAdmin()
   
-  // Parallel queries - load order and users simultaneously
-  const [order, users] = await Promise.all([
-    prisma.orders.findUnique({
-      where: { id },
-      include: {
-        customers: true,
-        deliveries: {
-          include: {
-            users: {
-              select: { name: true, email: true },
-            },
-          },
-        },
-        activity_logs: {
-          include: {
-            users: {
-              select: { name: true, email: true },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 50, // Limit activity logs to prevent huge payloads
-        },
-      },
-    }),
-    prisma.users.findMany({
-      where: { isActive: true },
-      select: { id: true, name: true, email: true },
-    })
-  ])
+  // Get order with related data
+  const { data: order, error: orderError } = await (supabase as any)
+    .from('orders')
+    .select(`
+      *,
+      customers(*),
+      deliveries(*, users(name, email)),
+      activity_logs(*, users(name, email))
+    `)
+    .eq('id', id)
+    .single()
   
-  if (!order) {
+  if (orderError || !order) {
     notFound()
   }
   
-  // Serialize order data - only include fields that match the interface
+  // Get active users
+  const { data: users } = await (supabase as any)
+    .from('users')
+    .select('id, name, email')
+    .eq('isActive', true)
+  
+  // Serialize order data
+  const delivery = Array.isArray(order.deliveries) ? order.deliveries[0] : order.deliveries
+  const activityLogs = Array.isArray(order.activity_logs) ? order.activity_logs : []
+  
   const serializedOrder = {
     id: order.id,
     shopifyId: order.shopifyId,
@@ -54,8 +46,8 @@ export default async function OrderDetailPage({
     totalAmount: Number(order.totalAmount),
     currency: order.currency,
     lineItems: order.lineItems as any[],
-    createdAt: order.createdAt.toISOString(),
-    updatedAt: order.updatedAt.toISOString(),
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
     customer: order.customers ? {
       firstName: order.customers.firstName,
       lastName: order.customers.lastName,
@@ -66,21 +58,21 @@ export default async function OrderDetailPage({
       postalCode: order.customers.postalCode,
       country: order.customers.country,
     } : null,
-    delivery: order.deliveries ? {
-      id: order.deliveries.id,
-      deliveryAddress: order.deliveries.deliveryAddress,
-      deliveryNotes: order.deliveries.deliveryNotes,
-      assignedTo: order.deliveries.users ? {
-        name: order.deliveries.users.name,
-        email: order.deliveries.users.email,
+    delivery: delivery ? {
+      id: delivery.id,
+      deliveryAddress: delivery.deliveryAddress,
+      deliveryNotes: delivery.deliveryNotesInternal,
+      assignedTo: delivery.users ? {
+        name: delivery.users.name,
+        email: delivery.users.email,
       } : null,
-      signatureUrl: order.deliveries.signatureUrl,
-      photoUrl: order.deliveries.photoUrl,
-      deliveredAt: order.deliveries.deliveredAt?.toISOString() || null,
-      latitude: order.deliveries.latitude,
-      longitude: order.deliveries.longitude,
+      signatureUrl: delivery.signatureUrl,
+      photoUrl: delivery.photoUrl,
+      deliveredAt: delivery.deliveredAt,
+      latitude: delivery.latitude,
+      longitude: delivery.longitude,
     } : null,
-    activityLogs: order.activity_logs.map(log => ({
+    activityLogs: activityLogs.map((log: any) => ({
       id: log.id,
       action: log.action,
       entityType: log.entityType,
@@ -88,7 +80,7 @@ export default async function OrderDetailPage({
       oldValue: log.oldValue,
       newValue: log.newValue,
       notes: log.notes,
-      createdAt: log.createdAt.toISOString(),
+      createdAt: log.createdAt,
       actor: log.users ? {
         name: log.users.name,
         email: log.users.email,
