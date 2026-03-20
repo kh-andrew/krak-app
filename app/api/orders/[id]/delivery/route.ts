@@ -95,23 +95,38 @@ export async function POST(
     let signatureUrl: string | null = null
     let photoUrl: string | null = null
     
-    // Upload signature if provided
+    // Upload signature if provided (don't fail if upload fails)
     if (signatureDataUrl) {
-      const signatureResult = await uploadSignature(signatureDataUrl, id)
-      signatureUrl = signatureResult?.url || null
+      try {
+        const signatureResult = await uploadSignature(signatureDataUrl, id)
+        signatureUrl = signatureResult?.url || null
+      } catch (uploadError) {
+        console.error('[SIGNATURE_UPLOAD_ERROR]', uploadError)
+        // Continue without signature - don't fail the delivery
+      }
     }
     
-    // Upload photo if provided (base64 or file)
+    // Upload photo if provided (don't fail if upload fails)
     const photoBase64 = formData.get('photoBase64') as string | null
     if (photoBase64) {
-      const buffer = Buffer.from(photoBase64, 'base64')
-      const photoResult = await uploadDeliveryPhoto(buffer, id)
-      photoUrl = photoResult?.url || null
+      try {
+        const buffer = Buffer.from(photoBase64, 'base64')
+        const photoResult = await uploadDeliveryPhoto(buffer, id)
+        photoUrl = photoResult?.url || null
+      } catch (uploadError) {
+        console.error('[PHOTO_UPLOAD_ERROR]', uploadError)
+        // Continue without photo - don't fail the delivery
+      }
     } else if (photo && photo.size > 0) {
-      const bytes = await photo.arrayBuffer()
-      const buffer = Buffer.from(bytes)
-      const photoResult = await uploadDeliveryPhoto(buffer, id)
-      photoUrl = photoResult?.url || null
+      try {
+        const bytes = await photo.arrayBuffer()
+        const buffer = Buffer.from(bytes)
+        const photoResult = await uploadDeliveryPhoto(buffer, id)
+        photoUrl = photoResult?.url || null
+      } catch (uploadError) {
+        console.error('[PHOTO_UPLOAD_ERROR]', uploadError)
+        // Continue without photo - don't fail the delivery
+      }
     }
     
     const oldStatus = delivery.orders.status
