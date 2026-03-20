@@ -55,9 +55,9 @@ export async function uploadSignature(
       url: result.secure_url,
       publicId: result.public_id,
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error uploading signature:', error)
-    return null
+    throw new Error(`Cloudinary signature upload failed: ${error.message || 'Unknown error'}`)
   }
 }
 
@@ -84,9 +84,9 @@ export async function uploadDeliveryPhoto(
       url: result.secure_url,
       publicId: result.public_id,
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error uploading delivery photo:', error)
-    return null
+    throw new Error(`Cloudinary photo upload failed: ${error.message || 'Unknown error'}`)
   }
 }
 

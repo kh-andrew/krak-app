@@ -54,6 +54,11 @@ export function getSupabaseAdmin() {
         auth: {
           autoRefreshToken: false,
           persistSession: false
+        },
+        global: {
+          headers: {
+            'X-Client-Info': 'supabase-js/2.x'
+          }
         }
       }
     )
