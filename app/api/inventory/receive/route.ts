@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getSupabaseUntyped } from '@/lib/supabase-untyped'
 
 // POST /api/inventory/receive
 // Full bundle expansion: KFSB → KFSP → KFSS
 export async function POST(req: Request) {
+  const supabase = getSupabaseUntyped()
+  
   try {
     const body = await req.json()
     console.log('[API_RECEIVE]', body)
@@ -18,256 +20,292 @@ export async function POST(req: Request) {
     const qty = parseInt(quantity)
     
     // Get or create default location
-    let location = await prisma.location.findFirst({ where: { code: 'WH-HK-01' } })
+    let { data: location } = await supabase
+      .from('Location')
+      .select('*')
+      .eq('code', 'WH-HK-01')
+      .single()
+    
     if (!location) {
-      location = await prisma.location.create({
-        data: { code: 'WH-HK-01', name: 'Hong Kong Warehouse', type: 'warehouse' }
-      })
+      const { data: newLocation } = await supabase
+        .from('Location')
+        .insert({ code: 'WH-HK-01', name: 'Hong Kong Warehouse', type: 'warehouse' })
+        .select()
+        .single()
+      location = newLocation
     }
     
-    // Start transaction for data consistency
-    const result = await prisma.$transaction(async (tx: any) => {
-      // Get or create product
-      let product = await tx.product.findUnique({ where: { sku: skuUpper } })
-      if (!product) {
-        const isBundle = skuUpper === 'KFSB' || skuUpper === 'KFSP'
-        product = await tx.product.create({
-          data: { 
-            sku: skuUpper, 
-            name: skuUpper,
-            isBundle,
-            basePrice: 0,
-            costPrice: 0
-          }
+    // Get or create product
+    let { data: product } = await supabase
+      .from('Product')
+      .select('*')
+      .eq('sku', skuUpper)
+      .single()
+    
+    if (!product) {
+      const isBundle = skuUpper === 'KFSB' || skuUpper === 'KFSP'
+      const { data: newProduct } = await supabase
+        .from('Product')
+        .insert({
+          sku: skuUpper,
+          name: skuUpper,
+          isBundle,
+          basePrice: 0,
+          costPrice: 0
         })
-      }
-      
-      // Update or create inventory for received SKU
-      let inventory = await tx.inventory.findFirst({
-        where: { productId: product.id, locationId: location.id }
-      })
-      
-      if (inventory) {
-        inventory = await tx.inventory.update({
-          where: { id: inventory.id },
-          data: {
-            currentStock: { increment: qty },
-            available: { increment: qty },
-            lastMovementAt: new Date()
-          }
+        .select()
+        .single()
+      product = newProduct
+    }
+    
+    // Update or create inventory for received SKU
+    let { data: inventory } = await supabase
+      .from('Inventory')
+      .select('*')
+      .eq('productId', product.id)
+      .eq('locationId', location.id)
+      .single()
+    
+    if (inventory) {
+      const { data: updated } = await supabase
+        .from('Inventory')
+        .update({
+          currentStock: (inventory.currentStock || 0) + qty,
+          available: (inventory.available || 0) + qty,
+          lastMovementAt: new Date().toISOString()
         })
-      } else {
-        inventory = await tx.inventory.create({
-          data: {
-            productId: product.id,
-            locationId: location.id,
-            currentStock: qty,
-            available: qty,
-            reorderPoint: skuUpper === 'KFSS' ? 500 : skuUpper === 'KFSP' ? 50 : 5,
-            reorderQty: skuUpper === 'KFSS' ? 1000 : skuUpper === 'KFSP' ? 100 : 10,
-            lastMovementAt: new Date()
-          }
+        .eq('id', inventory.id)
+        .select()
+        .single()
+      inventory = updated
+    } else {
+      const { data: newInventory } = await supabase
+        .from('Inventory')
+        .insert({
+          productId: product.id,
+          locationId: location.id,
+          currentStock: qty,
+          available: qty,
+          reorderPoint: skuUpper === 'KFSS' ? 500 : skuUpper === 'KFSP' ? 50 : 5,
+          reorderQty: skuUpper === 'KFSS' ? 1000 : skuUpper === 'KFSP' ? 100 : 10,
+          lastMovementAt: new Date().toISOString()
         })
-      }
-      
-      // Log movement
-      await tx.inventoryMovement.create({
-        data: {
-          inventoryId: inventory.id,
-          type: 'in',
-          quantity: qty,
-          reason: 'receipt',
-          notes: notes || `Received ${qty} ${skuUpper}`,
-          performedBy: 'system'
-        }
-      })
-      
-      // Bundle expansion: KFSB → KFSP → KFSS
-      let totalBottles = qty
-      
-      if (skuUpper === 'KFSB') {
-        // 1 KFSB = 20 KFSP = 240 KFSS
-        const kfspQty = qty * 20
-        
-        // Expand to KFSP
-        let kfsp = await tx.product.findUnique({ where: { sku: 'KFSP' } })
-        if (!kfsp) {
-          kfsp = await tx.product.create({
-            data: { sku: 'KFSP', name: 'KFSP', isBundle: true, basePrice: 0, costPrice: 0 }
-          })
-        }
-        
-        let kfspInv = await tx.inventory.findFirst({
-          where: { productId: kfsp.id, locationId: location.id }
-        })
-        
-        if (kfspInv) {
-          await tx.inventory.update({
-            where: { id: kfspInv.id },
-            data: { 
-              currentStock: { increment: kfspQty }, 
-              available: { increment: kfspQty },
-              lastMovementAt: new Date()
-            }
-          })
-        } else {
-          kfspInv = await tx.inventory.create({
-            data: {
-              productId: kfsp.id,
-              locationId: location.id,
-              currentStock: kfspQty,
-              available: kfspQty,
-              reorderPoint: 50,
-              reorderQty: 100,
-              lastMovementAt: new Date()
-            }
-          })
-        }
-        
-        // Log KFSP movement
-        await tx.inventoryMovement.create({
-          data: {
-            inventoryId: kfspInv.id,
-            type: 'in',
-            quantity: kfspQty,
-            reason: 'bundle_expansion',
-            notes: `Auto-generated from ${qty} KFSB`,
-            performedBy: 'system'
-          }
-        })
-        
-        // Expand KFSP to KFSS (1 KFSP = 12 KFSS)
-        const kfssQty = kfspQty * 12
-        
-        let kfss = await tx.product.findUnique({ where: { sku: 'KFSS' } })
-        if (!kfss) {
-          kfss = await tx.product.create({
-            data: { sku: 'KFSS', name: 'KFSS', isBundle: false, basePrice: 0, costPrice: 0 }
-          })
-        }
-        
-        let kfssInv = await tx.inventory.findFirst({
-          where: { productId: kfss.id, locationId: location.id }
-        })
-        
-        if (kfssInv) {
-          await tx.inventory.update({
-            where: { id: kfssInv.id },
-            data: { 
-              currentStock: { increment: kfssQty }, 
-              available: { increment: kfssQty },
-              lastMovementAt: new Date()
-            }
-          })
-        } else {
-          kfssInv = await tx.inventory.create({
-            data: {
-              productId: kfss.id,
-              locationId: location.id,
-              currentStock: kfssQty,
-              available: kfssQty,
-              reorderPoint: 500,
-              reorderQty: 1000,
-              lastMovementAt: new Date()
-            }
-          })
-        }
-        
-        // Log KFSS movement
-        await tx.inventoryMovement.create({
-          data: {
-            inventoryId: kfssInv.id,
-            type: 'in',
-            quantity: kfssQty,
-            reason: 'bundle_expansion',
-            notes: `Auto-generated from ${kfspQty} KFSP (from ${qty} KFSB)`,
-            performedBy: 'system'
-          }
-        })
-        
-        totalBottles = kfssQty
-      } else if (skuUpper === 'KFSP') {
-        // 1 KFSP = 12 KFSS
-        const kfssQty = qty * 12
-        
-        let kfss = await tx.product.findUnique({ where: { sku: 'KFSS' } })
-        if (!kfss) {
-          kfss = await tx.product.create({
-            data: { sku: 'KFSS', name: 'KFSS', isBundle: false, basePrice: 0, costPrice: 0 }
-          })
-        }
-        
-        let kfssInv = await tx.inventory.findFirst({
-          where: { productId: kfss.id, locationId: location.id }
-        })
-        
-        if (kfssInv) {
-          await tx.inventory.update({
-            where: { id: kfssInv.id },
-            data: { 
-              currentStock: { increment: kfssQty }, 
-              available: { increment: kfssQty },
-              lastMovementAt: new Date()
-            }
-          })
-        } else {
-          kfssInv = await tx.inventory.create({
-            data: {
-              productId: kfss.id,
-              locationId: location.id,
-              currentStock: kfssQty,
-              available: kfssQty,
-              reorderPoint: 500,
-              reorderQty: 1000,
-              lastMovementAt: new Date()
-            }
-          })
-        }
-        
-        // Log KFSS movement
-        await tx.inventoryMovement.create({
-          data: {
-            inventoryId: kfssInv.id,
-            type: 'in',
-            quantity: kfssQty,
-            reason: 'bundle_expansion',
-            notes: `Auto-generated from ${qty} KFSP`,
-            performedBy: 'system'
-          }
-        })
-        
-        totalBottles = kfssQty
-      }
-      
-      // Create batch if provided
-      if (batchCode) {
-        try {
-          await tx.batch.create({
-            data: {
-              batchCode: batchCode.toUpperCase(),
-              productId: product.id,
-              locationId: location.id,
-              initialQty: qty,
-              remainingQty: qty,
-              status: 'active'
-            }
-          })
-        } catch (e: any) {
-          // Batch may already exist, log but don't fail
-          console.log('[BATCH_EXISTS]', batchCode)
-        }
-      }
-      
-      return {
-        success: true,
-        sku: skuUpper,
-        quantity: qty,
-        totalBottles,
-        message: `Received ${qty} ${skuUpper} (${totalBottles} bottles total)`
-      }
+        .select()
+        .single()
+      inventory = newInventory
+    }
+    
+    // Log movement
+    await supabase.from('InventoryMovement').insert({
+      inventoryId: inventory.id,
+      type: 'in',
+      quantity: qty,
+      reason: 'receipt',
+      notes: notes || `Received ${qty} ${skuUpper}`,
+      performedBy: 'system'
     })
     
-    return NextResponse.json(result)
+    // Bundle expansion: KFSB → KFSP → KFSS
+    let totalBottles = qty
+    
+    if (skuUpper === 'KFSB') {
+      // 1 KFSB = 20 KFSP = 240 KFSS
+      const kfspQty = qty * 20
+      
+      // Expand to KFSP
+      let { data: kfsp } = await supabase.from('Product').select('*').eq('sku', 'KFSP').single()
+      if (!kfsp) {
+        const { data: newKfsp } = await supabase
+          .from('Product')
+          .insert({ sku: 'KFSP', name: 'KFSP', isBundle: true, basePrice: 0, costPrice: 0 })
+          .select()
+          .single()
+        kfsp = newKfsp
+      }
+      
+      let { data: kfspInv } = await supabase
+        .from('Inventory')
+        .select('*')
+        .eq('productId', kfsp.id)
+        .eq('locationId', location.id)
+        .single()
+      
+      if (kfspInv) {
+        await supabase
+          .from('Inventory')
+          .update({
+            currentStock: (kfspInv.currentStock || 0) + kfspQty,
+            available: (kfspInv.available || 0) + kfspQty,
+            lastMovementAt: new Date().toISOString()
+          })
+          .eq('id', kfspInv.id)
+      } else {
+        const { data: newKfspInv } = await supabase
+          .from('Inventory')
+          .insert({
+            productId: kfsp.id,
+            locationId: location.id,
+            currentStock: kfspQty,
+            available: kfspQty,
+            reorderPoint: 50,
+            reorderQty: 100,
+            lastMovementAt: new Date().toISOString()
+          })
+          .select()
+          .single()
+        kfspInv = newKfspInv
+      }
+      
+      // Log KFSP movement
+      await supabase.from('InventoryMovement').insert({
+        inventoryId: kfspInv?.id,
+        type: 'in',
+        quantity: kfspQty,
+        reason: 'bundle_expansion',
+        notes: `Auto-generated from ${qty} KFSB`,
+        performedBy: 'system'
+      })
+      
+      // Expand KFSP to KFSS (1 KFSP = 12 KFSS)
+      const kfssQty = kfspQty * 12
+      
+      let { data: kfss } = await supabase.from('Product').select('*').eq('sku', 'KFSS').single()
+      if (!kfss) {
+        const { data: newKfss } = await supabase
+          .from('Product')
+          .insert({ sku: 'KFSS', name: 'KFSS', isBundle: false, basePrice: 0, costPrice: 0 })
+          .select()
+          .single()
+        kfss = newKfss
+      }
+      
+      let { data: kfssInv } = await supabase
+        .from('Inventory')
+        .select('*')
+        .eq('productId', kfss.id)
+        .eq('locationId', location.id)
+        .single()
+      
+      if (kfssInv) {
+        await supabase
+          .from('Inventory')
+          .update({
+            currentStock: (kfssInv.currentStock || 0) + kfssQty,
+            available: (kfssInv.available || 0) + kfssQty,
+            lastMovementAt: new Date().toISOString()
+          })
+          .eq('id', kfssInv.id)
+      } else {
+        const { data: newKfssInv } = await supabase
+          .from('Inventory')
+          .insert({
+            productId: kfss.id,
+            locationId: location.id,
+            currentStock: kfssQty,
+            available: kfssQty,
+            reorderPoint: 500,
+            reorderQty: 1000,
+            lastMovementAt: new Date().toISOString()
+          })
+          .select()
+          .single()
+        kfssInv = newKfssInv
+      }
+      
+      // Log KFSS movement
+      await supabase.from('InventoryMovement').insert({
+        inventoryId: kfssInv?.id,
+        type: 'in',
+        quantity: kfssQty,
+        reason: 'bundle_expansion',
+        notes: `Auto-generated from ${kfspQty} KFSP (from ${qty} KFSB)`,
+        performedBy: 'system'
+      })
+      
+      totalBottles = kfssQty
+    } else if (skuUpper === 'KFSP') {
+      // 1 KFSP = 12 KFSS
+      const kfssQty = qty * 12
+      
+      let { data: kfss } = await supabase.from('Product').select('*').eq('sku', 'KFSS').single()
+      if (!kfss) {
+        const { data: newKfss } = await supabase
+          .from('Product')
+          .insert({ sku: 'KFSS', name: 'KFSS', isBundle: false, basePrice: 0, costPrice: 0 })
+          .select()
+          .single()
+        kfss = newKfss
+      }
+      
+      let { data: kfssInv } = await supabase
+        .from('Inventory')
+        .select('*')
+        .eq('productId', kfss.id)
+        .eq('locationId', location.id)
+        .single()
+      
+      if (kfssInv) {
+        await supabase
+          .from('Inventory')
+          .update({
+            currentStock: (kfssInv.currentStock || 0) + kfssQty,
+            available: (kfssInv.available || 0) + kfssQty,
+            lastMovementAt: new Date().toISOString()
+          })
+          .eq('id', kfssInv.id)
+      } else {
+        const { data: newKfssInv } = await supabase
+          .from('Inventory')
+          .insert({
+            productId: kfss.id,
+            locationId: location.id,
+            currentStock: kfssQty,
+            available: kfssQty,
+            reorderPoint: 500,
+            reorderQty: 1000,
+            lastMovementAt: new Date().toISOString()
+          })
+          .select()
+          .single()
+        kfssInv = newKfssInv
+      }
+      
+      // Log KFSS movement
+      await supabase.from('InventoryMovement').insert({
+        inventoryId: kfssInv?.id,
+        type: 'in',
+        quantity: kfssQty,
+        reason: 'bundle_expansion',
+        notes: `Auto-generated from ${qty} KFSP`,
+        performedBy: 'system'
+      })
+      
+      totalBottles = kfssQty
+    }
+    
+    // Create batch if provided
+    if (batchCode) {
+      try {
+        await supabase.from('Batch').insert({
+          batchCode: batchCode.toUpperCase(),
+          productId: product.id,
+          locationId: location.id,
+          initialQty: qty,
+          remainingQty: qty,
+          status: 'active'
+        })
+      } catch (e: any) {
+        console.log('[BATCH_EXISTS]', batchCode)
+      }
+    }
+    
+    return NextResponse.json({
+      success: true,
+      sku: skuUpper,
+      quantity: qty,
+      totalBottles,
+      message: `Received ${qty} ${skuUpper} (${totalBottles} bottles total)`
+    })
     
   } catch (error: any) {
     console.error('[API_RECEIVE_ERROR]', error.message, error.stack)

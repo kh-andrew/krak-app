@@ -1,15 +1,21 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getSupabaseAdmin } from '@/lib/supabase'
 
 export async function GET() {
   try {
+    const supabase = getSupabaseAdmin()
+    
     // Test database connection
-    const userCount = await prisma.users.count()
+    const { count, error } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true })
+    
+    if (error) throw error
     
     return NextResponse.json({
       status: 'healthy',
       database: 'connected',
-      users: userCount,
+      users: count || 0,
       timestamp: new Date().toISOString(),
     })
   } catch (error) {

@@ -1,5 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
+<<<<<<< Updated upstream
 import { Database } from '@/types/database'
+=======
+import { Database } from '@/types/supabase'
+>>>>>>> Stashed changes
 
 // Client for browser (anon key) - lazy initialization
 let clientInstance: ReturnType<typeof createClient<Database>> | null = null

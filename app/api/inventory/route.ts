@@ -1,34 +1,28 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getSupabaseAdmin } from '@/lib/supabase'
 
 // GET /api/inventory
 export async function GET() {
   try {
-    const inventory = await prisma.inventory.findMany({
-      take: 100,
-      orderBy: { available: 'asc' },
-      include: {
-        Product: {
-          select: {
-            id: true,
-            sku: true,
-            name: true,
-            basePrice: true,
-            isBundle: true
-          }
-        },
-        Location: {
-          select: {
-            id: true,
-            code: true,
-            name: true
-          }
-        }
-      }
-    })
+    const supabase = getSupabaseAdmin()
+    
+    const { data: inventory, error } = await supabase
+      .from('Inventory')
+      .select(`
+        *,
+        Product(id, sku, name, basePrice, isBundle),
+        Location(id, code, name)
+      `)
+      .order('available', { ascending: true })
+      .limit(100)
+    
+    if (error) {
+      console.error('[INVENTORY_GET_ERROR]', error)
+      return NextResponse.json({ error: 'Failed to fetch inventory' }, { status: 500 })
+    }
     
     // Transform to match expected format
-    const formatted = inventory.map(item => ({
+    const formatted = inventory.map((item: any) => ({
       id: item.id,
       currentStock: item.currentStock || 0,
       reserved: item.reserved || 0,

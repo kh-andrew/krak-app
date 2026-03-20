@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getSupabaseUntyped } from '@/lib/supabase-untyped'
 import { requireAuth } from '@/lib/auth-helpers'
-import { uploadSignature, uploadDeliveryPhoto } from '@/lib/cloudinary'
+import { uploadSignature, uploadDeliveryPhoto } from '@/lib/storage'
 import { updateShopifyOrderStatus, createFulfillment } from '@/lib/shopify-orders'
 import { syncDeliveryToHubSpot } from '@/lib/hubspot-sync'
 
@@ -11,23 +11,27 @@ export async function POST(
 ) {
   const session = await requireAuth()
   const { id } = await params
+  const supabase = getSupabaseUntyped()
   
   const formData = await req.formData()
   const action = formData.get('action') as string
   
-  const delivery = await prisma.deliveries.findUnique({
-    where: { orderId: id },
-    include: { orders: true },
-  })
+  // Get delivery with order info
+  const { data: delivery, error: deliveryError } = await supabase
+    .from('deliveries')
+    .select('*, orders(*)')
+    .eq('orderId', id)
+    .single()
   
-  if (!delivery) {
+  if (deliveryError || !delivery) {
+    console.error('[DELIVERY_GET_ERROR]', deliveryError)
     return NextResponse.json({ error: 'Delivery not found' }, { status: 404 })
   }
   
   // Handle assignment
   if (action === 'assign') {
     const userId = formData.get('userId') as string
-    const driverEmail = formData.get('driverEmail') as string // For Telegram workflow
+    const driverEmail = formData.get('driverEmail') as string
     
     const assignToId = userId || driverEmail
     
@@ -35,38 +39,46 @@ export async function POST(
       return NextResponse.json({ error: 'User ID or driver email required' }, { status: 400 })
     }
     
-    // Find or create user if assigning by email
+    // Find user by email if needed
     let assignedUserId = assignToId
-    if (driverEmail) {
-      const user = await prisma.users.findUnique({
-        where: { email: driverEmail }
-      })
+    if (driverEmail && !userId) {
+      const { data: user } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', driverEmail)
+        .single()
+      
       if (user) {
         assignedUserId = user.id
       }
     }
     
-    const updated = await prisma.deliveries.update({
-      where: { id: delivery.id },
-      data: {
+    // Update delivery assignment
+    const { data: updated, error: updateError } = await supabase
+      .from('deliveries')
+      .update({
         assignedToId: assignedUserId,
-        assignedAt: new Date(),
-      },
-    })
+        assignedAt: new Date().toISOString(),
+      })
+      .eq('id', delivery.id)
+      .select()
+      .single()
+    
+    if (updateError) {
+      console.error('[DELIVERY_ASSIGN_ERROR]', updateError)
+      return NextResponse.json({ error: 'Failed to assign delivery' }, { status: 500 })
+    }
     
     // Log activity
-    await prisma.activity_logs.create({
-      data: {
-        id: crypto.randomUUID(),
-        orderId: id,
-        actorId: session.user.id,
-        actorEmail: session.user.email,
-        action: 'delivery_assigned',
-        entityType: 'delivery',
-        fieldName: 'assignedToId',
-        newValue: userId,
-        notes: `Delivery assigned to user ${userId}`,
-      },
+    await supabase.from('activity_logs').insert({
+      orderId: id,
+      actorId: session.user.id,
+      actorEmail: session.user.email,
+      action: 'delivery_assigned',
+      entityType: 'delivery',
+      fieldName: 'assignedToId',
+      newValue: assignedUserId,
+      notes: `Delivery assigned to user ${assignedUserId}`,
     })
     
     return NextResponse.json(updated)
@@ -92,79 +104,82 @@ export async function POST(
     // Upload photo if provided (base64 or file)
     const photoBase64 = formData.get('photoBase64') as string | null
     if (photoBase64) {
-      // Convert base64 to buffer
       const buffer = Buffer.from(photoBase64, 'base64')
       const photoResult = await uploadDeliveryPhoto(buffer, id)
       photoUrl = photoResult?.url || null
     } else if (photo && photo.size > 0) {
-      // Handle file upload (fallback)
       const bytes = await photo.arrayBuffer()
       const buffer = Buffer.from(bytes)
       const photoResult = await uploadDeliveryPhoto(buffer, id)
       photoUrl = photoResult?.url || null
     }
     
+    const oldStatus = delivery.orders.status
+    
     // Update delivery
-    const updatedDelivery = await prisma.deliveries.update({
-      where: { id: delivery.id },
-      data: {
-        signatureUrl: signatureUrl || undefined,
-        photoUrl: photoUrl || undefined,
-        deliveredAt: new Date(),
-        latitude: latitude || undefined,
-        longitude: longitude || undefined,
-        deliveryNotesInternal: notes || undefined,
-      },
-    })
+    const { data: updatedDelivery, error: deliveryError } = await supabase
+      .from('deliveries')
+      .update({
+        signatureUrl,
+        photoUrl,
+        deliveredAt: new Date().toISOString(),
+        latitude,
+        longitude,
+        deliveryNotesInternal: notes,
+      })
+      .eq('id', delivery.id)
+      .select()
+      .single()
     
-    // Update order status
-    await prisma.orders.update({
-      where: { id },
-      data: { status: 'DELIVERED' },
-    })
-    
-    // Sync to Shopify - Update status AND create fulfillment
-    let shopifySynced = false
-    try {
-      // First update the order status (adds tag)
-      const statusUpdated = await updateShopifyOrderStatus(delivery.orders.shopifyId, 'DELIVERED')
-      
-      // Then create fulfillment with dummy tracking for local delivery
-      const fulfillmentCreated = await createFulfillment(
-        delivery.orders.shopifyId,
-        { 
-          company: 'Local Delivery',
-          number: `LOCAL-${Date.now()}`
-        }
-      )
-      
-      shopifySynced = statusUpdated && fulfillmentCreated
-    } catch (error) {
-      console.error('Shopify sync error:', error)
+    if (deliveryError) {
+      console.error('[DELIVERY_UPDATE_ERROR]', deliveryError)
+      return NextResponse.json({ error: 'Failed to update delivery' }, { status: 500 })
     }
     
-    await prisma.orders.update({
-      where: { id },
-      data: {
+    // Update order status
+    await supabase
+      .from('orders')
+      .update({ status: 'DELIVERED' })
+      .eq('id', id)
+    
+    // Sync to Shopify
+    let shopifySynced = false
+    if (delivery.orders.shopifyId) {
+      try {
+        const statusUpdated = await updateShopifyOrderStatus(delivery.orders.shopifyId, 'DELIVERED')
+        const fulfillmentCreated = await createFulfillment(
+          delivery.orders.shopifyId,
+          { 
+            company: 'Local Delivery',
+            number: `LOCAL-${Date.now()}`
+          }
+        )
+        shopifySynced = statusUpdated && fulfillmentCreated
+      } catch (error) {
+        console.error('[SHOPIFY_SYNC_ERROR]', error)
+      }
+    }
+    
+    // Update Shopify sync status
+    await supabase
+      .from('orders')
+      .update({
         shopifySyncStatus: shopifySynced ? 'SYNCED' : 'FAILED',
-        shopifyUpdatedAt: shopifySynced ? new Date() : null,
-      },
-    })
+        shopifyUpdatedAt: shopifySynced ? new Date().toISOString() : null,
+      })
+      .eq('id', id)
     
     // Log activity
-    await prisma.activity_logs.create({
-      data: {
-        id: crypto.randomUUID(),
-        orderId: id,
-        actorId: session.user.id,
-        actorEmail: session.user.email,
-        action: 'delivery_completed',
-        entityType: 'delivery',
-        fieldName: 'status',
-        oldValue: delivery.orders.status,
-        newValue: 'DELIVERED',
-        notes: `Delivery completed. Signature: ${signatureUrl ? 'Yes' : 'No'}, Photo: ${photoUrl ? 'Yes' : 'No'}`,
-      },
+    await supabase.from('activity_logs').insert({
+      orderId: id,
+      actorId: session.user.id,
+      actorEmail: session.user.email,
+      action: 'delivery_completed',
+      entityType: 'delivery',
+      fieldName: 'status',
+      oldValue: oldStatus,
+      newValue: 'DELIVERED',
+      notes: `Delivery completed. Signature: ${signatureUrl ? 'Yes' : 'No'}, Photo: ${photoUrl ? 'Yes' : 'No'}`,
     })
     
     // Sync to HubSpot (async)
