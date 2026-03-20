@@ -20,10 +20,11 @@ export async function GET() {
     })
   } catch (error: any) {
     console.error('[HEALTH_CHECK_ERROR]', error)
+    const errorMessage = error?.message || (typeof error === 'object' ? JSON.stringify(error) : String(error))
     return NextResponse.json({
       status: 'unhealthy',
       database: 'disconnected',
-      error: error?.message || error?.toString() || 'Unknown error',
+      error: errorMessage,
       timestamp: new Date().toISOString(),
     }, { status: 500 })
   }
