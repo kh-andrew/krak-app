@@ -35,11 +35,15 @@ export async function uploadSignature(
     if (uploadError) {
       // Bucket doesn't exist or other error — fall back to Cloudinary
       console.warn('[SUPABASE_STORAGE_FALLBACK] Bucket may not exist, using Cloudinary:', uploadError.message)
-      const cloudinaryResult = await uploadSignatureCloudinary(dataUrl, orderId)
-      if (cloudinaryResult) {
-        return { url: cloudinaryResult.url, source: 'cloudinary' }
+      try {
+        const cloudinaryResult = await uploadSignatureCloudinary(dataUrl, orderId)
+        if (cloudinaryResult) {
+          return { url: cloudinaryResult.url, source: 'cloudinary' }
+        }
+      } catch (cloudinaryError: any) {
+        throw new Error(`Supabase: ${uploadError.message}, Cloudinary: ${cloudinaryError.message}`)
       }
-      return null
+      throw new Error(`Supabase: ${uploadError.message}, Cloudinary: No result`)
     }
     
     // Get public URL
@@ -53,13 +57,9 @@ export async function uploadSignature(
       path,
       source: 'supabase',
     }
-  } catch (error) {
-    console.error('Error uploading signature, falling back to Cloudinary:', error)
-    const cloudinaryResult = await uploadSignatureCloudinary(dataUrl, orderId)
-    if (cloudinaryResult) {
-      return { url: cloudinaryResult.url, source: 'cloudinary' }
-    }
-    return null
+  } catch (error: any) {
+    console.error('Error uploading signature:', error)
+    throw error
   }
 }
 
@@ -87,11 +87,15 @@ export async function uploadDeliveryPhoto(
     if (uploadError) {
       // Bucket doesn't exist or other error — fall back to Cloudinary
       console.warn('[SUPABASE_STORAGE_FALLBACK] Bucket may not exist, using Cloudinary:', uploadError.message)
-      const cloudinaryResult = await uploadDeliveryPhotoCloudinary(fileBuffer, orderId)
-      if (cloudinaryResult) {
-        return { url: cloudinaryResult.url, source: 'cloudinary' }
+      try {
+        const cloudinaryResult = await uploadDeliveryPhotoCloudinary(fileBuffer, orderId)
+        if (cloudinaryResult) {
+          return { url: cloudinaryResult.url, source: 'cloudinary' }
+        }
+      } catch (cloudinaryError: any) {
+        throw new Error(`Supabase: ${uploadError.message}, Cloudinary: ${cloudinaryError.message}`)
       }
-      return null
+      throw new Error(`Supabase: ${uploadError.message}, Cloudinary: No result`)
     }
     
     // Get public URL
@@ -105,13 +109,9 @@ export async function uploadDeliveryPhoto(
       path,
       source: 'supabase',
     }
-  } catch (error) {
-    console.error('Error uploading photo, falling back to Cloudinary:', error)
-    const cloudinaryResult = await uploadDeliveryPhotoCloudinary(fileBuffer, orderId)
-    if (cloudinaryResult) {
-      return { url: cloudinaryResult.url, source: 'cloudinary' }
-    }
-    return null
+  } catch (error: any) {
+    console.error('Error uploading photo:', error)
+    throw error
   }
 }
 
