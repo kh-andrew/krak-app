@@ -80,6 +80,7 @@ export async function POST(req: Request) {
       const { data: newCustomer, error: customerError } = await supabase
         .from('customers')
         .insert({
+          id: crypto.randomUUID(),
           shopifyId: customer?.id?.toString(),
           email: customerEmail,
           firstName: customer?.first_name,
@@ -104,6 +105,7 @@ export async function POST(req: Request) {
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
+        id: crypto.randomUUID(),
         shopifyId: shopifyOrderId.toString(),
         shopifyOrderNumber: shopifyOrderNumber || `#${shopifyOrderId}`,
         customerId: customerId,
@@ -123,6 +125,7 @@ export async function POST(req: Request) {
     
     // Create delivery record
     await supabase.from('deliveries').insert({
+      id: crypto.randomUUID(),
       orderId: order.id,
       deliveryAddress: [
         shippingAddress?.address1,
@@ -137,6 +140,7 @@ export async function POST(req: Request) {
     
     // Log activity
     await supabase.from('activity_logs').insert({
+      id: crypto.randomUUID(),
       orderId: order.id,
       actorId: session.user.id,
       actorEmail: session.user.email,
