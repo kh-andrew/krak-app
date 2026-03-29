@@ -57,11 +57,11 @@ async function processOrderCreate(payload: any, supabase: any) {
   const customerEmail = email || customer?.email || `order-${id}@placeholder.com`
 
   // Check if customer exists
-  const { data: existingCustomer } = await supabase
+  const { data: existingCustomer, error: customerCheckError } = await supabase
     .from('customers')
     .select('id')
     .eq('email', customerEmail)
-    .single()
+    .maybeSingle()
 
   let customerId: string
 

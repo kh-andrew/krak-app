@@ -21,7 +21,13 @@ export default async function InventoryPage() {
       throw new Error(`API error: ${response.status}`)
     }
     
-    inventory = await response.json()
+    const data = await response.json()
+    inventory = data.inventory || []
+    
+    // Log debug info
+    if (data.debug) {
+      console.log('[INVENTORY DEBUG]', data.debug)
+    }
   } catch (e: any) {
     console.error('Inventory fetch error:', e)
     error = e.message
@@ -59,30 +65,30 @@ export default async function InventoryPage() {
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-blue-50 p-4 rounded-lg">
-          <div className="text-2xl font-bold text-blue-900">
+          <div className="text-xl lg:text-2xl font-bold text-blue-900">
             {inventory.reduce((sum, item) => sum + (item.physicalBottles || 0), 0).toLocaleString()}
           </div>
-          <div className="text-sm text-blue-700">Physical Bottles</div>
+          <div className="text-xs sm:text-sm text-blue-700">Physical Bottles</div>
         </div>
         <div className="bg-yellow-50 p-4 rounded-lg">
-          <div className="text-2xl font-bold text-yellow-900">
+          <div className="text-xl lg:text-2xl font-bold text-yellow-900">
             {inventory.reduce((sum, item) => sum + (item.committedBottles || 0), 0).toLocaleString()}
           </div>
-          <div className="text-sm text-yellow-700">Committed to Orders</div>
+          <div className="text-xs sm:text-sm text-yellow-700">Committed to Orders</div>
         </div>
         <div className="bg-green-50 p-4 rounded-lg">
-          <div className="text-2xl font-bold text-green-900">
+          <div className="text-xl lg:text-2xl font-bold text-green-900">
             {inventory.reduce((sum, item) => sum + (item.availableBottles || 0), 0).toLocaleString()}
           </div>
-          <div className="text-sm text-green-700">Available for Sale</div>
+          <div className="text-xs sm:text-sm text-green-700">Available for Sale</div>
         </div>
         <div className="bg-red-50 p-4 rounded-lg">
-          <div className="text-2xl font-bold text-red-900">
+          <div className="text-xl lg:text-2xl font-bold text-red-900">
             {inventory.filter(item => item.needsReorder).length}
           </div>
-          <div className="text-sm text-red-700">SKUs Need Reorder</div>
+          <div className="text-xs sm:text-sm text-red-700">SKUs Need Reorder</div>
         </div>
       </div>
 

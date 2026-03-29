@@ -44,19 +44,29 @@ export async function GET() {
     // Calculate committed stock by SKU
     const committedBySku: Record<string, number> = {}
     
+    console.log(`[INVENTORY] Processing ${orders?.length || 0} non-delivered orders`)
+    
     for (const order of orders || []) {
       const lineItems = (order.lineItems || []) as any[]
+      console.log(`[INVENTORY] Order line items:`, JSON.stringify(lineItems))
+      
       for (const item of lineItems) {
         const sku = item.sku || item.title
         const quantity = item.quantity || 0
+        
+        console.log(`[INVENTORY] Item: sku=${sku}, qty=${quantity}`)
         
         // Convert to bottle equivalent
         const bottleQty = SKU_QUANTITIES[sku] || 1
         const totalBottles = quantity * bottleQty
         
+        console.log(`[INVENTORY] ${sku}: ${quantity} units × ${bottleQty} bottles = ${totalBottles} bottles`)
+        
         committedBySku[sku] = (committedBySku[sku] || 0) + totalBottles
       }
     }
+    
+    console.log(`[INVENTORY] Committed by SKU:`, committedBySku)
     
     // Transform inventory with calculated fields
     const formatted = inventory.map((item: any) => {
@@ -98,7 +108,13 @@ export async function GET() {
       }
     })
     
-    return NextResponse.json(formatted)
+    return NextResponse.json({
+      inventory: formatted,
+      debug: {
+        totalOrders: orders?.length || 0,
+        committedBySku,
+      }
+    })
   } catch (error: any) {
     console.error('[API_INVENTORY_GET]', error.message)
     return NextResponse.json({ error: 'Failed to fetch inventory' }, { status: 500 })

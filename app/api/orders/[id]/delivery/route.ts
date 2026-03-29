@@ -115,44 +115,50 @@ export async function POST(
       }
     }
     
-    // Upload photo if provided
+    // Upload photo if provided (optional - signature is sufficient)
     const photoBase64 = formData.get('photoBase64') as string | null
-    if (photoBase64) {
+    
+    // Try photoBase64 first (from mobile camera)
+    if (photoBase64 && photoBase64.length > 0) {
       try {
-        const buffer = Buffer.from(photoBase64, 'base64')
-        const photoResult = await uploadDeliveryPhoto(buffer, id)
-        photoUrl = photoResult?.url || null
-        if (!photoUrl) {
-          return NextResponse.json(
-            { error: 'Photo upload failed - no URL returned' },
-            { status: 500 }
-          )
+        // Remove data URL prefix if present
+        const cleanBase64 = photoBase64.replace(/^data:image\/\w+;base64,/, '')
+        const buffer = Buffer.from(cleanBase64, 'base64')
+        
+        // Validate buffer is not empty
+        if (buffer.length === 0) {
+          console.warn('[PHOTO_UPLOAD] Empty buffer from base64, skipping photo')
+        } else {
+          const photoResult = await uploadDeliveryPhoto(buffer, id)
+          photoUrl = photoResult?.url || null
+          if (!photoUrl) {
+            console.warn('[PHOTO_UPLOAD] No URL returned, continuing without photo')
+          }
         }
       } catch (uploadError: any) {
-        console.error('[PHOTO_UPLOAD_ERROR]', uploadError)
-        return NextResponse.json(
-          { error: `Photo upload failed: ${uploadError.message || 'Unknown error'}` },
-          { status: 500 }
-        )
+        // Log error but don't fail - photo is optional
+        console.error('[PHOTO_UPLOAD_ERROR]', uploadError.message)
+        console.log('[PHOTO_UPLOAD] Continuing without photo upload')
       }
-    } else if (photo && photo.size > 0) {
+    } 
+    // Try File object as fallback
+    else if (photo && photo.size > 0) {
       try {
-        const bytes = await photo.arrayBuffer()
-        const buffer = Buffer.from(bytes)
-        const photoResult = await uploadDeliveryPhoto(buffer, id)
-        photoUrl = photoResult?.url || null
-        if (!photoUrl) {
-          return NextResponse.json(
-            { error: 'Photo upload failed - no URL returned' },
-            { status: 500 }
-          )
+        // Check file size (max 10MB)
+        if (photo.size > 10 * 1024 * 1024) {
+          console.warn('[PHOTO_UPLOAD] File too large, skipping')
+        } else {
+          const bytes = await photo.arrayBuffer()
+          const buffer = Buffer.from(bytes)
+          const photoResult = await uploadDeliveryPhoto(buffer, id)
+          photoUrl = photoResult?.url || null
+          if (!photoUrl) {
+            console.warn('[PHOTO_UPLOAD] No URL returned, continuing without photo')
+          }
         }
       } catch (uploadError: any) {
-        console.error('[PHOTO_UPLOAD_ERROR]', uploadError)
-        return NextResponse.json(
-          { error: `Photo upload failed: ${uploadError.message || 'Unknown error'}` },
-          { status: 500 }
-        )
+        console.error('[PHOTO_UPLOAD_ERROR]', uploadError.message)
+        console.log('[PHOTO_UPLOAD] Continuing without photo upload')
       }
     }
     
